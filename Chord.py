@@ -2,6 +2,7 @@ import hashlib
 import select
 import socket
 import struct
+import sys
 
 # Control message types
 FIND_SUCCESSOR = 1
@@ -88,6 +89,8 @@ def checkPredecessor():
     pass
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+	print("Missing self ip!")
     # Load parameters from config file
     #configFile = open("chordDFS.config")
     finger_table_size = 6
@@ -102,15 +105,16 @@ if __name__ == "__main__":
 
     tracker_node = ChordNode(tracker_node_ip)
 
-    my_ip = socket.gethostbyname(socket.gethostname())
+    my_ip = sys.argv[1] # need to pass in self as ip ow we get localhost as ip
     me = ChordNode(my_ip)
 
     is_tracker = my_ip == tracker_node_ip
 
     print("Hi! I'm a chord node, my IP is {0}, my chord_id is {1}".format(my_ip, me.chord_id))
+
     if is_tracker:
         print("Oh, and I'm the tracker!")
-
+    sys.stdout.flush() # need to flush output, else never show up
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     control_sock.bind((my_ip, control_port))

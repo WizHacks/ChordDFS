@@ -30,7 +30,7 @@ def startNetwork(num_nodes):
     "instantiates a topo, then starts the network and prints debug information"
 
     info('** Creating Quagga network topology\n')
-    topo = QuaggaTopo(nodes=num_nodes)
+    topo = QuaggaTopo(num_nodes)
 
     info('** Starting the network\n')
     global net
@@ -60,9 +60,9 @@ def stopNetwork():
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        num_nodes = sys.argv[1]
+        num_nodes = int(sys.argv[1])
     else:
-        num_nodes = 10
+        num_nodes = 5
     # Force cleanup on exit by registering a cleanup function
     atexit.register(stopNetwork)
 

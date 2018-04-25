@@ -1,14 +1,12 @@
 #!/usr/bin/python
 
 """
-Example network of Quagga routers
-(QuaggaTopo + QuaggaService)
+ChordDFS Nodes
 """
 
 import sys
 import atexit
 
-# patch isShellBuiltin
 import mininet.util
 import mininext.util
 mininet.util.isShellBuiltin = mininext.util.isShellBuiltin
@@ -21,7 +19,7 @@ from mininet.log import setLogLevel, info
 from mininext.cli import CLI
 from mininext.net import MiniNExT
 
-from topo import QuaggaTopo
+from topo import ChordDFSTopo
 
 net = None
 
@@ -30,7 +28,7 @@ def startNetwork(num_nodes):
     "instantiates a topo, then starts the network and prints debug information"
 
     info('** Creating Quagga network topology\n')
-    topo = QuaggaTopo(num_nodes)
+    topo = ChordDFSTopo(num_nodes)
 
     info('** Starting the network\n')
     global net
@@ -59,7 +57,7 @@ def stopNetwork():
     "stops a network (only called on a forced cleanup)"
 
     if net is not None:
-        info('** Tearing down Quagga network\n')
+        info('** Tearing down ChordDFS network\n')
         net.stop()
 
 if __name__ == '__main__':

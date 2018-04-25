@@ -25,7 +25,7 @@ def __init__(self, num_nodes):
 
 	# create nodes
 	for node in range(num_nodes):		
-		node = self.addHost(name='n{0}'.format(node+1), ip='172.1.1.{0}/24'.format(node+1)))
+		node = self.addHost(name='n{0}'.format(node+1), ip='172.1.1.{0}/24'.format(node+1))
 		chordDFSHosts.append(node)
 		# create corresponding directories
 		if not os.path.exists("n{0}".format(node+1)):

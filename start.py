@@ -27,7 +27,7 @@ net = None
 def startNetwork(num_nodes):
     "instantiates a topo, then starts the network and prints debug information"
 
-    info('** Creating Quagga network topology\n')
+    info('** Creating ChordDFS network topology\n')
     topo = ChordDFSTopo(num_nodes)
 
     info('** Starting the network\n')
@@ -41,9 +41,9 @@ def startNetwork(num_nodes):
     '''info('** Testing network connectivity\n')
     net.ping(net.hosts)'''
 
-    info('** Dumping host processes\n')
+    '''info('** Dumping host processes\n')
     for host in net.hosts:
-        host.cmdPrint("ps aux")
+        host.cmdPrint("ps aux")'''
 
     info('** Running Chord on hosts\n')
     for host in net.hosts:

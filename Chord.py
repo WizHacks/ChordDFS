@@ -7,6 +7,7 @@ import socket
 import struct
 import sys
 import time
+import os
 
 # Message types
 FIND_SUCCESSOR = "1"        # Propogate a find successor message
@@ -47,21 +48,41 @@ def mnPrint(msg):
 
     # Write msg to log file
     if my_ip != "":
-        with open("logs/" + fileName() + ".log", "a") as logFile:
+        with open(log_file_path, "a") as logFile:
             logFile.write("{0} {1}\n".format(str(datetime.now()).replace(" ", "_"), msg))
 
 # Represents any object that has a place on the Chord ring
 class ChordNode:
-    def __init__(self, key):
+    def __init__(self, key, name=""):
         # Chord Nodes can be used for network nodes or files
         self.ip = key
         self.filename = key
+        self.name = name
         
         # Use hash to find position on ring
         self.chord_id = get_hash(key) % ring_size
 
     def __str__(self):
-        return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)
+        return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
+
+
+    def generate_finger_table(self, finger_table_size):
+        ''' Generate skeleton finger table
+        '''
+        finger_table = {}
+        for index in range(finger_table_size):
+            finger_table[self.chord_id + 2**(index+1)] = -1
+        
+        return finger_table    
+
+    def print_finger_table(self, finger_table):
+        ''' Print entries in finger table
+        '''
+        index = 1
+        for key,value in finger_table.items():
+            print("N{0} + {1}: N{2}".format(key-2**index,2**index,value))
+            index +=1
+
 
 # Get the hash of a key
 def get_hash(key):
@@ -81,7 +102,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     # Serialize the message
     msg_json = json.dumps(msg)
     if sys.version_info[0] >= 3:
-        msg_json = bytes(msg_json)
+        msg_json = bytes(msg_json, encoding="utf-8")
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
@@ -108,6 +129,8 @@ def ctrlMsgReceived():
         filename = msg['filename']
         findSuccessor(key, target, filename)
     # Someone returned our find successor query
+    # TODO: since have 1 successor, ie, other nodes in ring, try to find rest of successors for successor list
+    # TODO: why are we finding files using this?
     elif msg_type == RETURN_SUCCESSOR:
         suc_ip = msg['suc_ip']
         filename = msg['filename']
@@ -115,7 +138,7 @@ def ctrlMsgReceived():
         # No filename indicates we wanted to find our successor
         if filename == "":
             successor = ChordNode(suc_ip)
-            mnPrint("Successor updated by find successor: " + str(successor))
+            mnPrint("Successor updated by find successor:{0} {1}".format(successor))
         # Filename indicates we wanted to find a file's location
         else:
             # TODO: open TCP connection using a thread or fork
@@ -216,6 +239,7 @@ def closestPreceedingNode(key):
     global finger_table, finger_table_size
 
     # Starting at furthest point in table, moving closer, see if table entry preceeds the given key
+    # TODO: finger table is a dictionary, fix this
     for i in range(finger_table_size, -1, -1):
         if keyInRange(finger_table[i].chord_id, me.chord_id, key):
             return finger_table[i]
@@ -248,7 +272,11 @@ def notify(node):
         # TODO: transfer all keys/files whose ids < node.chord_id to node
 
 def fixFingers():
-    pass
+    '''Refresh the finger table entries periodicially'''
+    global finger_table, finger_table_size
+    # TODO: install timer to run periodically
+    for key in finger_table.keys():
+        finger_table[key] = findSuccessor(key,me.ip)
 
 def checkPredecessor():
     pass
@@ -273,23 +301,27 @@ if __name__ == "__main__":
         control_port = config['control_port']
         file_listen_port = config['file_listen_port']
         using_finger_table = config['using_finger_table']
+        num_successors = config['num_successors']
     except:
         pass
 
     # Ring size is relative to finger table size s.t.
     #   the last entry on the finger table will cross half the ring
-    ring_size = 2**finger_table_size
+    ring_size = 2**finger_table_size # m
 
     # Pass in self as ip (getpeername gets localhost as ip)
     my_ip = ""
-    if len(sys.argv) < 2:
-        mnPrint("Missing self ip!")
+    my_name = ""
+    if len(sys.argv) < 3:
+        mnPrint("Missing self ip and name!")
         quit()
     my_ip = sys.argv[1]
-    me = ChordNode(my_ip)
+    my_name = sys.argv[2]
+    me = ChordNode(my_ip,my_name)
 
     # Create/clear log file
-    with open("logs/" + fileName() + ".log", "w") as logFile:
+    log_file_path = "nodes/{0}/logs/{1}.log".format(me.name,fileName())
+    with open(log_file_path, "w") as logFile:
         logFile.write("")
 
     # Get tracker based on ip from config
@@ -299,7 +331,7 @@ if __name__ == "__main__":
     is_tracker = my_ip == tracker_node_ip
 
     # Announce initialization
-    mnPrint("Hi! I'm a chord node, my IP is {0}, my chord_id is {1}".format(my_ip, me.chord_id))
+    mnPrint("Hi! I'm a chord node, my IP is {0}, my chord_id is {1}".format(me.ip, me.chord_id))
     if is_tracker:
         mnPrint("Oh, and I'm the tracker!")
     
@@ -316,12 +348,14 @@ if __name__ == "__main__":
     entries = []
 
     # Maps filename to operation we want to perform when we find its location in the ring ('send' or 'request')
-    outstanding_file_reqs = dict()
-
-    finger_table = []
+    outstanding_file_reqs = dict()   
 
     # Predecessor is null by default
     predecessor = None
+
+    # successor list
+    # TODO: store up to num_successor -> needed for failure and replication
+    successors = []    
 
     # Tracker creates the network, and is thus its own successor
     if is_tracker:
@@ -331,6 +365,10 @@ if __name__ == "__main__":
         time.sleep(1)
         successor = None
         join()
+
+    # up to m entries; me.name + 2^i
+    finger_table = me.generate_finger_table(finger_table_size)
+    fixFingers()    
 
     # Install timer to run processes
     # TODO: use threading for this, since this will prob break other things

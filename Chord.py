@@ -10,42 +10,8 @@ import sys
 import time
 import os
 
-# Message types
-FIND_SUCCESSOR = "1"        # Propogate a find successor message
-RETURN_SUCCESSOR = "2"      # Return the result of a find successor query
-GET_PREDECESSOR = "3"       # Request a node's predecessor
-RETURN_PREDECESSOR = "4"    # Return your predecessor
-NOTIFY_PREDECESSOR = "5"    # Notify node that you are its predecessor
-CHECK_ALIVE = "6"           # Request a validation that you are alive
-AM_ALIVE = "7"              # Return alive validation
-SEND_FILE = "8"             # Forward a file to a node
-REQUEST_FILE = "9"          # Request a file from a node (or client)
-
-# Message types specific to Tracker/Client interactions
-INSERT_FILE = "10"
-GET_FILE = "11"
-GET_FILE_LIST = "12"
-ERR = "13"
-
-# Network file operations
-OP_SEND_FILE = "send"
-OP_REQ_FILE = "request"
-
-# Print that will show up in mininet output and get added to log file
-def mnPrint(msg):
-    global my_ip
-
-    # Format msg
-    msg = "<{0}>: {1}".format(my_ip, msg)
-
-    # Print msg to stdout
-    print(msg)
-    sys.stdout.flush() # need to flush output, else never show up
-
-    # Write msg to log file
-    if my_ip != "":
-        with open(log_file_path, "a") as logFile:
-            logFile.write("{0} {1}\n".format(str(datetime.now()).replace(" ", "_"), msg))
+from ReadLog import MyLogger
+from ChordMessage import ChordMessage as c_msg
 
 # Represents any object that has a place on the Chord ring
 class ChordNode:
@@ -124,7 +90,7 @@ def ctrlMsgReceived():
     msg_type = msg['msg_type']
 
     # We are supposed to find target's successor
-    if msg_type == FIND_SUCCESSOR:
+    if msg_type == c_msg.FIND_SUCCESSOR:
         key = msg['key']
         target = msg['target']
         filename = msg['filename']
@@ -132,7 +98,7 @@ def ctrlMsgReceived():
     # Someone returned our find successor query
     # TODO: since have 1 successor, ie, other nodes in ring, try to find rest of successors for successor list
     # TODO: why are we finding files using this?
-    elif msg_type == RETURN_SUCCESSOR:
+    elif msg_type == c_msg.RETURN_SUCCESSOR:
         suc_ip = msg['suc_ip']
         filename = msg['filename']
         finger = msg['finger']
@@ -141,15 +107,15 @@ def ctrlMsgReceived():
 	        # Finger update
             if finger is not None:
                 finger_table[finger] = suc_ip                
-                mnPrint(me.print_finger_table(finger_table))
+                myLogger.mnPrint(me.print_finger_table(finger_table))
             # Successor update
             else:
                 successor = ChordNode(suc_ip)
-                mnPrint("Successor updated by find successor:{0}".format(successor))
+                myLogger.mnPrint("Successor updated by find successor:{0}".format(successor))
         # Filename indicates we wanted to find a file's location
         else:
             fileNode = ChordNode(filename)
-            mnPrint("Found " + str(fileNode) + " at " + suc_ip)
+            myLogger.mnPrint("Found " + str(fileNode) + " at " + suc_ip)
             if outstanding_file_reqs[filename] == OP_SEND_FILE:
                 sendFile(suc_ip, filename)
             elif outstanding_file_reqs[filename] == OP_REQ_FILE:
@@ -157,54 +123,54 @@ def ctrlMsgReceived():
                 msg['filename'] = filename
                 sendCtrlMsg(suc_ip, REQUEST_FILE, msg)
     # Someone wants to know who our predecessor is
-    elif msg_type == GET_PREDECESSOR:
+    elif msg_type == c_msg.GET_PREDECESSOR:
         msg = dict()
         msg['pred_ip'] = None if predecessor is None else predecessor.ip
-        sendCtrlMsg(addr[0], RETURN_PREDECESSOR, msg)
+        sendCtrlMsg(addr[0], c_msg.RETURN_PREDECESSOR, msg)
     # Our successor told us who their predecessor is
-    elif msg_type == RETURN_PREDECESSOR:
+    elif msg_type == c_msg.RETURN_PREDECESSOR:
         pred_ip = msg['pred_ip']
         stabilize(None if pred_ip == None else ChordNode(pred_ip))
     # Someone told us that they are our predecessor
-    elif msg_type == NOTIFY_PREDECESSOR:
+    elif msg_type == c_msg.NOTIFY_PREDECESSOR:
         pred_ip = msg['pred_ip']
         notify(ChordNode(pred_ip))
     # Someone wants to know we are alive
-    elif msg_type == CHECK_ALIVE:
+    elif msg_type == c_msg.CHECK_ALIVE:
         pass
     # Someone told us they were alive
-    elif msg_type == AM_ALIVE:
+    elif msg_type == c_msg.AM_ALIVE:
         pass
     # Someone sent us a file
-    elif msg_type == SEND_FILE:
+    elif msg_type == c_msg.SEND_FILE:
         filename = msg['filename']
         content = msg['content']
         with open("{0}/{1}".format(file_dir_path, filename), "w") as newFile:
             newFile.write(content)
         entries.append(filename)
-        mnPrint("Received file " + filename + " from " + str(addr[0]))
+        myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
     # Someone wants a file from us
-    elif msg_type == REQUEST_FILE:
-        mnPrint(msg['filename'] + " requested from " + addr[0])
+    elif msg_type == c_msg.REQUEST_FILE:
+        myLogger.mnPrint(msg['filename'] + " requested from " + addr[0])
         sendFile(addr[0], msg['filename'])
 
     # We are supposed to insert a file into the network
-    elif msg_type == INSERT_FILE:
+    elif msg_type == c_msg.INSERT_FILE:
         filename = msg['filename']
-        outstanding_file_reqs[filename] = OP_SEND_FILE
+        outstanding_file_reqs[filename] = c_msg.OP_SEND_FILE
         fileNode = ChordNode(filename)
-        mnPrint("Inserting " + str(fileNode))
+        myLogger.mnPrint("Inserting " + str(fileNode))
         # TODO: instead of me.ip, addr[0] (when we have client)
         findSuccessor(fileNode.chord_id, me.ip, filename=filename)
     # We are supposed to retrieve a file from the network
-    elif msg_type == GET_FILE:
+    elif msg_type == c_msg.GET_FILE:
         filename = msg['filename']
-        outstanding_file_reqs[filename] = OP_REQ_FILE
+        outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
         fileNode = ChordNode(filename)
-        mnPrint("Retrieving " + str(fileNode))
+        myLogger.mnPrint("Retrieving " + str(fileNode))
         # TODO: instead of me.ip, addr[0] (when we have client)
         findSuccessor(fileNode.chord_id, me.ip, filename=filename)
-    elif msg_type == GET_FILE_LIST:
+    elif msg_type == c_msg.GET_FILE_LIST:
         pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
@@ -213,7 +179,7 @@ def handle_alrm(signum, frame):
 
     # Will get our successor's predecessor and call stabilize on return
     if successor != None:
-        sendCtrlMsg(successor.ip, GET_PREDECESSOR, dict())
+        sendCtrlMsg(successor.ip, c_msg.GET_PREDECESSOR, dict())
 
     # Update our finger table
     if using_finger_table:
@@ -236,7 +202,7 @@ def keyInRange(key, start_id, end_id, inc_end=False):
 
 # Join the network by finding out who your successor is
 def join():
-    mnPrint("Joining the network...")
+    myLogger.mnPrint("Joining the network...")
     findSuccessor(me.chord_id, me.ip)
 
 # Find the ip of the chord node that should succeed the given key
@@ -251,7 +217,7 @@ def findSuccessor(key, target, filename="",finger=None):
         msg['suc_ip'] = successor.ip
         msg['filename'] = filename
         msg['finger'] = finger
-        sendCtrlMsg(target, RETURN_SUCCESSOR, msg)
+        sendCtrlMsg(target, c_msg.RETURN_SUCCESSOR, msg)
     # Otherwise, send request to successor
     else:
         # Get node to send request to
@@ -267,7 +233,7 @@ def findSuccessor(key, target, filename="",finger=None):
         msg['key'] = key
         msg['target'] = target
         msg['filename'] = filename
-        sendCtrlMsg(dst.ip, FIND_SUCCESSOR, msg)
+        sendCtrlMsg(dst.ip, c_msg.FIND_SUCCESSOR, msg)
 
 # Find the node in { {me} U finger_table } that preceeds the given key closest
 def closestPreceedingNode(key):
@@ -288,12 +254,12 @@ def stabilize(x):
     # If x is closer than our current successor, it is our new successor
     if x != None and keyInRange(x.chord_id, me.chord_id, successor.chord_id):
         successor = x
-        mnPrint("Successor updated by stabilize: " + str(successor))
+        myLogger.mnPrint("Successor updated by stabilize: " + str(successor))
 
     # Notify successor that we are its predecessor
     msg = dict()
     msg['pred_ip'] = me.ip
-    sendCtrlMsg(successor.ip, NOTIFY_PREDECESSOR, msg)
+    sendCtrlMsg(successor.ip, c_msg.NOTIFY_PREDECESSOR, msg)
 
 # Node told us that it is our predecessor
 def notify(node):
@@ -302,7 +268,7 @@ def notify(node):
     # If the given id is between our current predecessor and us (or if we had no predecessor) then set it to be our predecessor
     if predecessor == None or keyInRange(node.chord_id, predecessor.chord_id, me.chord_id):
         predecessor = node
-        mnPrint("Predecessor updated by notify: " + str(predecessor))
+        myLogger.mnPrint("Predecessor updated by notify: " + str(predecessor))
         # TODO: transfer all keys/files whose ids < node.chord_id to node
 
 def fixFingers():
@@ -321,13 +287,20 @@ def sendFile(dst_ip, filename):
     # TODO: open TCP connection using a thread or fork
     # TODO: load content from file
     msg['content'] = "testingggg"
-    mnPrint("Sending " + filename + " to " + dst_ip)
-    sendCtrlMsg(dst_ip, SEND_FILE, msg)
+    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
+    sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
     # TODO: only remove entry after successful send
     if filename in entries:
         entries.remove(filename)
     else:
         print(filename + " not found in entries")
+
+def exit(arg=None):
+    '''exit the application
+    '''
+    if arg is not None:
+        sys.exit(arg)
+    sys.exit()     
 
 if __name__ == "__main__":
     # Default parameters
@@ -336,6 +309,7 @@ if __name__ == "__main__":
     control_port = 500
     file_listen_port = 501
     using_finger_table = False
+    num_successors = 1
 
     try:
         # Open config file
@@ -361,13 +335,16 @@ if __name__ == "__main__":
     my_ip = ""
     my_name = ""
     if len(sys.argv) < 3:
-        mnPrint("Missing self ip and name!")
-        quit()
+        myLogger.mnPrint("Missing self ip and name!")
+        exit()
     my_ip = sys.argv[1]
     my_name = sys.argv[2]
     me = ChordNode(my_ip,my_name)
 
-    # Create directory for this node
+    log_file_path = "nodes/{0}/logs/{1}.log".format(me.name, me.ip.replace(".", "_"))
+
+    # this is done in mininet upon creation of nodes
+    '''# Create directory for this node
     node_directory = "nodes/" + me.name
     if not os.path.exists(node_directory):
         os.makedirs(node_directory)
@@ -381,6 +358,7 @@ if __name__ == "__main__":
     file_dir_path = node_directory + "/files"
     if not os.path.exists(file_dir_path):
         os.makedirs(file_dir_path)
+    '''
 
     # TODO: clear out files
 
@@ -388,20 +366,23 @@ if __name__ == "__main__":
     tracker = ChordNode(tracker_node_ip)
 
     # If we are the tracker node
-    is_tracker = my_ip == tracker_node_ip
+    is_tracker = me.ip == tracker_node_ip
+
+    # create logger
+    myLogger = MyLogger(me.ip, log_file_path)
 
     # Announce initialization
-    mnPrint("Hi! I'm a chord node, my IP is {0}, my chord_id is {1}".format(me.ip, me.chord_id))
+    myLogger.mnPrint("Hi! I'm a chord node, my IP is {0}, my chord_id is {1}, my name is {2}".format(me.ip, me.chord_id, me.name))
     if is_tracker:
-        mnPrint("Oh, and I'm the tracker!")
+        myLogger.mnPrint("Oh, and I'm the tracker!")
     
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    control_sock.bind((my_ip, control_port))
+    control_sock.bind((me.ip, control_port))
 
     # Socket specifically for accepting file transfer connections
     file_listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    file_listen_sock.bind((my_ip, file_listen_port))
+    file_listen_sock.bind((me.ip, file_listen_port))
     file_listen_sock.listen(5)
 
     # Name of every file that we are responsible for
@@ -445,7 +426,7 @@ if __name__ == "__main__":
     # Keeps track of (sock, local_fd) pairs for each incoming file
     incoming_file_transfers = []
 
-    # # Keeps track of (sock, local_fd) pairs for each outgoing file
+    # Keeps track of (sock, local_fd) pairs for each outgoing file
     outgoing_file_transfers = []
 
     while True:

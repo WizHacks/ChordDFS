@@ -31,8 +31,14 @@ class ChordDFSTopo(Topo):
 			if not os.path.exists("nodes/n{0}".format(node+1)):
 				os.makedirs("nodes/n{0}".format(node+1))
 				os.makedirs("nodes/n{0}/files".format(node+1))
+				os.makedirs("nodes/n{0}/files/chord".format(node+1))
+				os.makedirs("nodes/n{0}/files/client".format(node+1))
 				os.makedirs("nodes/n{0}/logs".format(node+1))
-
+			# clean the directories
+			else:
+				for root, dirs, files in os.walk(".", topdown=False):
+					for file in files:
+						os.remove(os.path.join(root,file))
 		ixpfabric = self.addSwitch('sw1')
 		for node in chordDFSHosts:
 			self.addLink(node, ixpfabric)

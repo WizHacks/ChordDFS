@@ -63,6 +63,8 @@ class ChordNode:
         self.chord_id = get_hash(key) % ring_size
 
     def __str__(self):
+	if self.name == "":
+		return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)		
         return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
 
 
@@ -71,17 +73,20 @@ class ChordNode:
         '''
         fingers = []
         for index in range(finger_table_size):
-            fingers.append[self.chord_id + 2**(index+1)]
-        
+            fingers.append(self.chord_id + (2**index))
+        print(fingers)
         return fingers    
 
     def print_finger_table(self, finger_table):
         ''' Print entries in finger table
         '''
-        index = 1
-        for key,value in finger_table.items():
-            print("N{0} + {1}: N{2}".format(key-2**index,2**index,value))
+	text = "\n"
+        index = 0
+	print(finger_table.keys())
+        for key,value in sorted(finger_table.items()):
+            text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
             index +=1
+	return text
 
 
 # Get the hash of a key
@@ -137,11 +142,10 @@ def ctrlMsgReceived():
         finger = msg['finger']
         # No filename indicates we wanted to find our successor
         if filename == "":
+	    # finger update
             if finger is not None:
-                finger_table[finger] = suc_ip   
-                mnPrint("Finger table updated!")
-                me.print_finger_table(finger_table)
-                mnPrint("")                     
+                finger_table[finger] = suc_ip                
+                mnPrint(me.print_finger_table(finger_table))                     
             else:
                 successor = ChordNode(suc_ip)
                 mnPrint("Successor updated by find successor:{0}".format(successor))

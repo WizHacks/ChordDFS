@@ -1,6 +1,7 @@
 from datetime import datetime
 import hashlib
 import json
+import os
 import select
 import signal
 import socket
@@ -29,11 +30,6 @@ ERR = "12"
 OP_SEND_FILE = "send"
 OP_REQ_FILE = "request"
 
-def fileName():
-    global my_ip
-
-    return my_ip.replace(".", "_")
-
 # Print that will show up in mininet output and get added to log file
 def mnPrint(msg):
     global my_ip
@@ -47,7 +43,8 @@ def mnPrint(msg):
 
     # Write msg to log file
     if my_ip != "":
-        with open("logs/" + fileName() + ".log", "a") as logFile:
+        #with open("logs/" + fileName() + ".log", "a") as logFile:
+        with open(node_directory + "/log.log", "w") as logFile:
             logFile.write("{0} {1}\n".format(str(datetime.now()).replace(" ", "_"), msg))
 
 # Represents any object that has a place on the Chord ring
@@ -118,13 +115,11 @@ def ctrlMsgReceived():
             mnPrint("Successor updated by find successor: " + str(successor))
         # Filename indicates we wanted to find a file's location
         else:
-            # TODO: open TCP connection using a thread or fork
-            msg = dict()
-            msg['filename'] = filename
             if outstanding_file_reqs[filename] == OP_SEND_FILE:
-                sendCtrlMsg(suc_ip, SEND_FILE, msg)
-                entries.remove(filename)
+                sendFile(suc_ip, filename)
             elif outstanding_file_reqs[filename] == OP_REQ_FILE:
+                msg = dict()
+                msg['filename'] = filename
                 sendCtrlMsg(suc_ip, REQUEST_FILE, msg)
     # Someone wants to know who our predecessor is
     elif msg_type == GET_PREDECESSOR:
@@ -148,8 +143,13 @@ def ctrlMsgReceived():
     # Someone sent us a file
     elif msg_type == SEND_FILE:
         filename = msg['filename']
+        content = msg['content']
+        # TODO: write content to file
         entries.append(filename)
         mnPrint("Received file: " + str(entry))
+    # Someone wants a file from us
+    elif msg_type == REQUEST_FILE:
+        sendFile(addr[0], msg['filename'])
 
 # This calls all methods that need to be called frequently to keep the network synchronized
 def handle_alrm(signum, frame):
@@ -253,6 +253,16 @@ def fixFingers():
 def checkPredecessor():
     pass
 
+def sendFile(dst_ip, filename):
+    msg = dict()
+    msg['filename'] = filename
+    # TODO: open TCP connection using a thread or fork
+    # TODO: load content from file
+    msg['content'] = ""
+    sendCtrlMsg(suc_ip, SEND_FILE, msg)
+    entries.remove(filename)
+
+
 if __name__ == "__main__":
     # Default parameters
     finger_table_size = 6
@@ -288,9 +298,21 @@ if __name__ == "__main__":
     my_ip = sys.argv[1]
     me = ChordNode(my_ip)
 
+    # Create directory for this node
+    node_directory = my_ip.replace(".", "_")
+    if not os.path.exists(node_directory):
+        os.makedirs(node_directory)
+
     # Create/clear log file
-    with open("logs/" + fileName() + ".log", "w") as logFile:
+    # with open("logs/" + fileName() + ".log", "w") as logFile:
+    with open(node_directory + "/log.log", "w") as logFile:
         logFile.write("")
+
+    # Create files directory for this node
+    if not os.path.exists(node_directory + "/files"):
+        os.makedirs(node_directory + "/files")
+
+    # TODO: clear out files
 
     # Get tracker based on ip from config
     tracker = ChordNode(tracker_node_ip)

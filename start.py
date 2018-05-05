@@ -45,9 +45,9 @@ def startNetwork(num_nodes):
     for host in net.hosts:
         host.cmdPrint("ps aux")'''
 
-    info('** Running Chord on hosts\n')
+    '''info('** Running Chord on hosts\n')
     for host in net.hosts:
-        host.cmdPrint("python2 Chord.py {0} {1} &".format(host.IP(), host.name))
+        host.cmdPrint("python2 Chord.py {0} {1} &".format(host.IP(), host.name))'''
 
     info('** Running CLI\n')
     CLI(net)

@@ -4,6 +4,7 @@ import socket
 import select
 import sys
 import os
+import fcntl
 
 from ReadLog import MyLogger
 from ChordMessage import ChordMessage as c_msg
@@ -78,16 +79,17 @@ class Client():
 		sendMessage(c_msg.GET_FILE_LIST, msg)	
 
 	'''Helper methods'''
-	def processRequest(self, request, arg=None):
+	def processRequest(self, request, args=None):
 		'''
 		Have the player client make a request
 		request: the request to make
 		arg: arg for request
 		'''
+		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))
 		if request == c_msg.GET_FILE:
-			self.get_file(arg)
+			self.get_file(args[0])
 		elif request == c_msg.INSERT_FILE:
-			self.insert_file(arg)
+			self.insert_file(args[0])
 		elif request == c_msg.GET_FILE_LIST:
 			self.get_file_list()	
 		else:
@@ -117,6 +119,8 @@ class Client():
 def exit(arg=None):
 	'''exit the application
 	'''
+	# close stdin so program doesnt break
+	os.close(sys.stdin.fileno())
 	if arg is not None:
 		sys.exit(arg)
 	sys.exit()
@@ -130,23 +134,35 @@ def processStdin():
 	'''Process the stdin input and take appropriate action
 	'''
 	global me
-	args = sys.stdin.read(128).strip().split(" ")	
-	cmd = args[0].upper()
-	# HELP
-	if cmd == c_msg.HELP:
-		help()	
-	# EXIT
-	elif cmd == c_msg.EXIT:
-		exit()
-	# client handles itself
+	global std_input
+	# read until new line
+	ch = sys.stdin.read()
+	if ch != "\n":
+		std_input += ch
+		return
 	else:
-		me.processRequest(cmd, args[1])
+		args = std_input.split(" ")
+		std_input = ""
+	# handle stdin
+	if len(args) > 0:
+		me.myLogger.mnPrint("received stdin request: {0}".format(args))
+		cmd = args[0].upper().strip()		
+		# HELP
+		if cmd == c_msg.HELP:
+			help()	
+		# EXIT
+		elif cmd == c_msg.EXIT:
+			exit()
+		# client handles itself
+		else:	
+			me.processRequest(cmd, args[1:])
 
 def help():
 	'''
 	Prints the help menu
 	'''
-	print()
+	print("help request")
+	sys.stdout.flush()
 
 if __name__ == "__main__":	
 
@@ -158,7 +174,9 @@ if __name__ == "__main__":
         sys.exit()
     my_ip = sys.argv[1]
     my_name = sys.argv[2]    
-
+	
+    std_input = ""	
+	
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # Socket specifically for accepting file transfer connections
@@ -172,8 +190,8 @@ if __name__ == "__main__":
     file_listen_sock.listen(5)	        
 
     # Multiplexing lists	
-    stdinfd = sys.stdin.fileno()
-    rlist = [control_sock, file_listen_sock, stdinfd]
+    fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	
+    rlist = [control_sock, file_listen_sock, sys.stdin]
     wlist = []
     xlist = []		
 
@@ -187,7 +205,7 @@ if __name__ == "__main__":
 	    if control_sock in _rlist:
 	        ctrlMsgReceived()
 
-	    if stdinfd in _rlist:
+	    if sys.stdin in _rlist:
 	    	processStdin()    
 
 	    if file_listen_sock in _rlist:

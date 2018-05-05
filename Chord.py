@@ -66,14 +66,14 @@ class ChordNode:
         return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
 
 
-    def generate_finger_table(self, finger_table_size):
-        ''' Generate skeleton finger table
+    def generate_fingers(self, finger_table_size):
+        ''' Generate skeleton fingers
         '''
-        finger_table = {}
+        fingers = []
         for index in range(finger_table_size):
-            finger_table[self.chord_id + 2**(index+1)] = -1
+            fingers.append[self.chord_id + 2**(index+1)]
         
-        return finger_table    
+        return fingers    
 
     def print_finger_table(self, finger_table):
         ''' Print entries in finger table
@@ -109,7 +109,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
 
 # Received a UDP message
 def ctrlMsgReceived():
-    global successor, predecessor, entries, outstanding_file_reqs
+    global successor, predecessor, entries, outstanding_file_reqs, finger_table
 
     # Get data from socket
     try:
@@ -134,11 +134,17 @@ def ctrlMsgReceived():
     elif msg_type == RETURN_SUCCESSOR:
         suc_ip = msg['suc_ip']
         filename = msg['filename']
-
+        finger = msg['finger']
         # No filename indicates we wanted to find our successor
         if filename == "":
-            successor = ChordNode(suc_ip)
-            mnPrint("Successor updated by find successor:{0} {1}".format(successor))
+            if finger is not None:
+                finger_table[finger] = suc_ip   
+                mnPrint("Finger table updated!")
+                me.print_finger_table(finger_table)
+                mnPrint("")                     
+            else:
+                successor = ChordNode(suc_ip)
+                mnPrint("Successor updated by find successor:{0}".format(successor))
         # Filename indicates we wanted to find a file's location
         else:
             # TODO: open TCP connection using a thread or fork
@@ -207,7 +213,7 @@ def join():
 
 # Find the ip of the chord node that should succeed the given key
 # If filename is specified, this is for inserting a file
-def findSuccessor(key, target, filename=""):
+def findSuccessor(key, target, filename="",finger=None):
     global successor
 
     # If key is somewhere between self and self.successor, then self.successor directly succeeds key
@@ -216,6 +222,7 @@ def findSuccessor(key, target, filename=""):
         msg = dict()
         msg['suc_ip'] = successor.ip
         msg['filename'] = filename
+        msg['finger'] = finger
         sendCtrlMsg(target, RETURN_SUCCESSOR, msg)
     # Otherwise, send request to successor
     else:
@@ -239,10 +246,9 @@ def closestPreceedingNode(key):
     global finger_table, finger_table_size
 
     # Starting at furthest point in table, moving closer, see if table entry preceeds the given key
-    # TODO: finger table is a dictionary, fix this
     for i in range(finger_table_size, -1, -1):
-        if keyInRange(finger_table[i].chord_id, me.chord_id, key):
-            return finger_table[i]
+        if keyInRange(finger_table[fingers[i]], me.chord_id, key):
+            return finger_table[fingers[i]]
     
     # Otherwise, we are the closest node we know of
     return me
@@ -274,9 +280,9 @@ def notify(node):
 def fixFingers():
     '''Refresh the finger table entries periodicially'''
     global finger_table, finger_table_size
-    # TODO: install timer to run periodically
+   
     for key in finger_table.keys():
-        finger_table[key] = findSuccessor(key,me.ip)
+        findSuccessor(key,me.ip,finger=key)
 
 def checkPredecessor():
     pass
@@ -367,7 +373,8 @@ if __name__ == "__main__":
         join()
 
     # up to m entries; me.name + 2^i
-    finger_table = me.generate_finger_table(finger_table_size)
+    fingers = me.generate_fingers(finger_table_size)
+    finger_table = {key: None for key in fingers}
     fixFingers()    
 
     # Install timer to run processes

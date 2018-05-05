@@ -22,10 +22,10 @@ SEND_FILE = "8"             # Forward a file to a node
 REQUEST_FILE = "9"          # Request a file from a node (or client)
 
 # Message types specific to Tracker/Client interactions
-INSERT_FILE = "9"
-GET_FILE = "10"
-GET_FILE_LIST = "11"
-ERR = "12"
+INSERT_FILE = "10"
+GET_FILE = "11"
+GET_FILE_LIST = "12"
+ERR = "13"
 
 # Network file operations
 OP_SEND_FILE = "send"
@@ -128,7 +128,7 @@ def ctrlMsgReceived():
         key = msg['key']
         target = msg['target']
         filename = msg['filename']
-        findSuccessor(key, target, filename)
+        findSuccessor(key, target, filename=filename)
     # Someone returned our find successor query
     # TODO: since have 1 successor, ie, other nodes in ring, try to find rest of successors for successor list
     # TODO: why are we finding files using this?
@@ -138,15 +138,18 @@ def ctrlMsgReceived():
         finger = msg['finger']
         # No filename indicates we wanted to find our successor
         if filename == "":
-	    # finger update
+	        # Finger update
             if finger is not None:
                 finger_table[finger] = suc_ip                
-                mnPrint(me.print_finger_table(finger_table))                     
+                mnPrint(me.print_finger_table(finger_table))
+            # Successor update
             else:
                 successor = ChordNode(suc_ip)
                 mnPrint("Successor updated by find successor:{0}".format(successor))
         # Filename indicates we wanted to find a file's location
         else:
+            fileNode = ChordNode(filename)
+            mnPrint("Found " + str(fileNode) + " at " + suc_ip)
             if outstanding_file_reqs[filename] == OP_SEND_FILE:
                 sendFile(suc_ip, filename)
             elif outstanding_file_reqs[filename] == OP_REQ_FILE:
@@ -176,12 +179,33 @@ def ctrlMsgReceived():
     elif msg_type == SEND_FILE:
         filename = msg['filename']
         content = msg['content']
-        # TODO: write content to file
+        with open("{0}/{1}".format(file_dir_path, filename), "w") as newFile:
+            newFile.write(content)
         entries.append(filename)
-        mnPrint("Received file: " + str(entry))
+        mnPrint("Received file " + filename + " from " + str(addr[0]))
     # Someone wants a file from us
     elif msg_type == REQUEST_FILE:
+        mnPrint(msg['filename'] + " requested from " + addr[0])
         sendFile(addr[0], msg['filename'])
+
+    # We are supposed to insert a file into the network
+    elif msg_type == INSERT_FILE:
+        filename = msg['filename']
+        outstanding_file_reqs[filename] = OP_SEND_FILE
+        fileNode = ChordNode(filename)
+        mnPrint("Inserting " + str(fileNode))
+        # TODO: instead of me.ip, addr[0] (when we have client)
+        findSuccessor(fileNode.chord_id, me.ip, filename=filename)
+    # We are supposed to retrieve a file from the network
+    elif msg_type == GET_FILE:
+        filename = msg['filename']
+        outstanding_file_reqs[filename] = OP_REQ_FILE
+        fileNode = ChordNode(filename)
+        mnPrint("Retrieving " + str(fileNode))
+        # TODO: instead of me.ip, addr[0] (when we have client)
+        findSuccessor(fileNode.chord_id, me.ip, filename=filename)
+    elif msg_type == GET_FILE_LIST:
+        pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
 def handle_alrm(signum, frame):
@@ -192,7 +216,8 @@ def handle_alrm(signum, frame):
         sendCtrlMsg(successor.ip, GET_PREDECESSOR, dict())
 
     # Update our finger table
-    fixFingers()
+    if using_finger_table:
+        fixFingers()
 
     # Checks to see if the predecessor is still alive
     if predecessor != None:
@@ -285,7 +310,7 @@ def fixFingers():
     global finger_table, finger_table_size
    
     for key in finger_table.keys():
-        findSuccessor(key,me.ip,finger=key)
+        findSuccessor(key, me.ip, finger=key)
 
 def checkPredecessor():
     pass
@@ -295,10 +320,14 @@ def sendFile(dst_ip, filename):
     msg['filename'] = filename
     # TODO: open TCP connection using a thread or fork
     # TODO: load content from file
-    msg['content'] = ""
-    sendCtrlMsg(suc_ip, SEND_FILE, msg)
-    entries.remove(filename)
-
+    msg['content'] = "testingggg"
+    mnPrint("Sending " + filename + " to " + dst_ip)
+    sendCtrlMsg(dst_ip, SEND_FILE, msg)
+    # TODO: only remove entry after successful send
+    if filename in entries:
+        entries.remove(filename)
+    else:
+        print(filename + " not found in entries")
 
 if __name__ == "__main__":
     # Default parameters
@@ -349,8 +378,9 @@ if __name__ == "__main__":
         logFile.write("")
 
     # Create files directory for this node
-    if not os.path.exists(node_directory + "/files"):
-        os.makedirs(node_directory + "/files")
+    file_dir_path = node_directory + "/files"
+    if not os.path.exists(file_dir_path):
+        os.makedirs(file_dir_path)
 
     # TODO: clear out files
 
@@ -397,9 +427,10 @@ if __name__ == "__main__":
         join()
 
     # up to m entries; me.name + 2^i
-    fingers = me.generate_fingers(finger_table_size)
-    finger_table = {key: None for key in fingers}
-    fixFingers()    
+    if using_finger_table:
+        fingers = me.generate_fingers(finger_table_size)
+        finger_table = {key: None for key in fingers}
+        fixFingers()    
 
     # Install timer to run processes
     # TODO: use threading for this, since this will prob break other things

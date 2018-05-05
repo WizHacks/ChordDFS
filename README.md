@@ -9,5 +9,5 @@ Distributed File System implementation using Chord algorithm
 
 ## Instructions
 1. Run `sudo python start.py --num_nodes` where `num_nodes` is the number of nodes in your topology that you want to start. Currently, there is an issue with using `num_nodes` > 9.
-2. Start Chord protocol on any of the nodes by running `node# python Chord.py node#` where node# is the corresponding node; ie, `n1 python Chord.py n1`.
+2. Start Chord protocol on any of the nodes by running `node# python Chord.py node# \node#` where node# is the corresponding node; ie, `n1 python Chord.py n1 \n1`.
 3. TBC

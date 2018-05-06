@@ -92,7 +92,7 @@ class Client():
 		elif request == c_msg.INSERT_FILE:
 			self.insert_file(args[0])
 		elif request == c_msg.GET_FILE_LIST:
-			self.get_file_list()	
+			self.get_file_list()			
 		else:
 			pass
 
@@ -109,12 +109,17 @@ class Client():
 
 		# Send the message to the destination's control port
 		self.control_sock.sendto(msg_json, (self.tracker_node_ip, self.control_port))
+		self.myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, self.tracker_node_ip, msg))
 
 	def list_dir(self):
 		'''
 		list own directory
 		'''
 		pass
+	def processResponse(self, data, addr):
+		msg = json.loads(str(data))
+		msg_type = msg['msg_type']
+		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
 
 '''utility functions'''
 def exit(arg=None):
@@ -127,7 +132,14 @@ def exit(arg=None):
 def ctrlMsgReceived():
 	''''''
 	global me
-	pass
+	# Get data from socket
+	try:
+		data, addr = me.control_sock.recvfrom(1024)
+	except socket.error as e:
+		print(e)
+		return
+	# Parse message type and respond accordingly        
+	me.processResponse(data,addr)
 
 def processStdin():
 	'''Process the stdin input and take appropriate action
@@ -173,8 +185,15 @@ if __name__ == "__main__":
         sys.exit()
     my_ip = sys.argv[1]
     my_name = sys.argv[2]    
+
+    # stdin interaction	
+    std_input = ""
+
+    # script testing		
+    script = None	
+    if len(sys.argv) == 4:
+	script = sys.argv[3]	
 	
-    std_input = ""	
 	
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -188,14 +207,28 @@ if __name__ == "__main__":
     file_listen_sock.bind((me.ip, me.file_listen_port))
     file_listen_sock.listen(5)	        
 
-    # Multiplexing lists	
+    # script --> blocking
+    if script is not None:
+	cmds_to_run = []
+	with open(script, "r") as f_in:
+		cmds_to_run = f_in.read().split("\n")
+	while len(cmds_to_run) != 0:
+		args = cmds_to_run.pop(0).split(" ")
+		if len(args) != 0 and args[0] != "":
+			cmd = args[0].upper().strip()					
+			me.processRequest(cmd, args[1:])
+			ctrlMsgReceived()
+	# prevent broken pipe
+        exit()
+
+    # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	
     rlist = [control_sock, file_listen_sock, sys.stdin]
     wlist = []
     xlist = []		
 
     while True:
-		# Multiplex on possible network messages
+	    # Multiplex on possible network messages
 	    try:
 	        _rlist, _wlist, _xlist = select.select(rlist, wlist, xlist)
 	    except:

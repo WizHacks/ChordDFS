@@ -73,7 +73,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip,msg))
+    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, msg))
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -89,7 +89,7 @@ def ctrlMsgReceived():
     # Parse message type and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
-    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0],msg))
+    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:
@@ -296,7 +296,7 @@ def sendFile(dst_ip, filename):
     msg = dict()
     msg['filename'] = filename
     # TODO: open TCP connection using a thread or fork
-    # TODO: load content from file
+    # TODO: load content from file, check file exists
     msg['content'] = "testingggg"
     myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)

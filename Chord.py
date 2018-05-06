@@ -359,6 +359,9 @@ if __name__ == "__main__":
     if not os.path.exists(file_dir_path):
         os.makedirs(file_dir_path)
     '''
+	
+    node_directory = "nodes/" + me.name    
+    file_dir_path = node_directory + "/files/chord/"    
 
     # TODO: clear out files
 

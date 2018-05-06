@@ -11,9 +11,9 @@ class ChordMessage():
 	REQUEST_FILE = "9"          # Request a file from a node (or client)
 
 	# Message types specific to Tracker/Client interactions
-	INSERT_FILE = "10"
-	GET_FILE = "11"
-	GET_FILE_LIST = "12"
+	INSERT_FILE = "INSERT"
+	GET_FILE = "GET"
+	GET_FILE_LIST = "LIST"
 	ERR = "13"
 
 	# Network file operations

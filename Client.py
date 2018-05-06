@@ -63,20 +63,20 @@ class Client():
 			msg = dict()
 			msg['filename'] = filename
 			msg['content'] = content
-			sendMessage(c_msg.INSERT_FILE, msg)	
+			self.sendMessage(c_msg.INSERT_FILE, msg)	
 
 	def get_file(self, filename):
 		'''Request a file
 		'''
 		msg = dict()
 		msg['filename'] = filename
-		sendMessage(c_msg.GET_FILE, msg)		
+		self.sendMessage(c_msg.GET_FILE, msg)		
 
 	def get_file_list(self):
 		'''Request available files
 		'''
 		msg = dict()        
-		sendMessage(c_msg.GET_FILE_LIST, msg)	
+		self.sendMessage(c_msg.GET_FILE_LIST, msg)	
 
 	'''Helper methods'''
 	def processRequest(self, request, args=None):
@@ -107,7 +107,7 @@ class Client():
 		    msg_json = bytes(msg_json, encoding="utf-8")
 
 		# Send the message to the destination's control port
-		self.control_sock.sendto(msg_json, (self.tracker, self.control_port))
+		self.control_sock.sendto(msg_json, (self.tracker_node_ip, self.control_port))
 
 	def list_dir(self):
 		'''
@@ -119,8 +119,6 @@ class Client():
 def exit(arg=None):
 	'''exit the application
 	'''
-	# close stdin so program doesnt break
-	os.close(sys.stdin.fileno())
 	if arg is not None:
 		sys.exit(arg)
 	sys.exit()

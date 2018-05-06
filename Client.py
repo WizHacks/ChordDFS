@@ -197,7 +197,7 @@ if __name__ == "__main__":
     # script testing		
     script = None	
     if len(sys.argv) == 4:
-	script = sys.argv[3]	
+    	script = sys.argv[3]	
 	
 	
     # Socket specifically for communicating with other chord nodes
@@ -214,18 +214,18 @@ if __name__ == "__main__":
 
     # script --> blocking
     if script is not None:
-	cmds_to_run = []
-	with open(script, "r") as f_in:
-		cmds_to_run = f_in.read().split("\n")
-	while len(cmds_to_run) != 0:
-		args = cmds_to_run.pop(0).split(" ")
-		if len(args) != 0 and args[0] != "":
-			cmd = args[0].upper().strip()					
-			block = me.processRequest(cmd, args[1:])
-			if block:
-				ctrlMsgReceived()
-	# prevent broken pipe
-        exit()	
+    	cmds_to_run = []
+    	with open(script, "r") as f_in:
+    		cmds_to_run = f_in.read().split("\n")
+    	while len(cmds_to_run) != 0:
+    		args = cmds_to_run.pop(0).split(" ")
+    		if len(args) != 0 and args[0] != "":
+    			cmd = args[0].upper().strip()					
+    			block = me.processRequest(cmd, args[1:])
+    			if block:
+    				ctrlMsgReceived()
+    	# prevent broken pipe
+    	exit()	
 
     # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	

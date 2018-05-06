@@ -70,6 +70,7 @@ class Client():
 		'''
 		msg = dict()
 		msg['filename'] = filename
+		msg["client_ip"] = self.ip
 		self.sendMessage(c_msg.GET_FILE, msg)		
 
 	def get_file_list(self):

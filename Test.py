@@ -1,12 +1,7 @@
 import json
 import socket
 import sys
-
-# Message types specific to Tracker/Client interactions
-INSERT_FILE = "10"
-GET_FILE = "11"
-GET_FILE_LIST = "12"
-ERR = "13"
+from ChordMessage import ChordMessage as c_msg
 
 # Send a UDP message to another node
 def sendCtrlMsg(dst_ip, msg_type, msg):
@@ -31,9 +26,9 @@ if __name__ == "__main__":
     if op == "insert":
         msg = dict()
         msg['filename'] = filename
-        sendCtrlMsg("172.1.1.1", INSERT_FILE, msg)
+        sendCtrlMsg("172.1.1.1", c_msg.INSERT_FILE, msg)
     elif op == "get":
         msg = dict()
         msg['filename'] = filename
-        sendCtrlMsg("172.1.1.1", GET_FILE, msg)
+        sendCtrlMsg("172.1.1.1", c_msg.GET_FILE, msg)
         

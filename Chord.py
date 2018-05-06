@@ -73,7 +73,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    myLogger.mnPrint("msg type:{0} sent to {1}".format(msg_type, dst_ip))
+    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip,msg))
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -81,8 +81,7 @@ def ctrlMsgReceived():
 
     # Get data from socket
     try:
-        data, addr = control_sock.recvfrom(1024)myLogger.mnPrint("msg type:{0} sent to {1}".format(msg_type, dst_ip))
-        myLogger.mnPrint("msg type:{0} rcvd from {1}".format(msg_type, addr[0]))
+        data, addr = control_sock.recvfrom(1024)
     except socket.error as e:
         print(e)
         return
@@ -90,6 +89,7 @@ def ctrlMsgReceived():
     # Parse message type and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
+    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0],msg))
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:
@@ -99,11 +99,10 @@ def ctrlMsgReceived():
         findSuccessor(key, target, filename=filename)
     # Someone returned our find successor query
     # TODO: since have 1 successor, ie, other nodes in ring, try to find rest of successors for successor list
-    # TODO: why are we finding files using this?
     elif msg_type == c_msg.RETURN_SUCCESSOR:
         suc_ip = msg['suc_ip']
         filename = msg['filename']
-        finger = msg['finger']
+        finger = msg['finger']	
         # No filename indicates we wanted to find our successor
         if filename == "":
 	        # Finger update
@@ -118,12 +117,10 @@ def ctrlMsgReceived():
         else:
             fileNode = ChordNode(filename)
             myLogger.mnPrint("Found " + str(fileNode) + " at " + suc_ip)
-            if outstanding_file_reqs[filename] == OP_SEND_FILE:
+            if outstanding_file_reqs[filename] == c_msg.OP_SEND_FILE:
                 sendFile(suc_ip, filename)
-            elif outstanding_file_reqs[filename] == OP_REQ_FILE:
-                msg = dict()
-                msg['filename'] = filename
-                sendCtrlMsg(suc_ip, REQUEST_FILE, msg)
+            elif outstanding_file_reqs[filename] == c_msg.OP_REQ_FILE:
+                sendCtrlMsg(suc_ip, c_msg.REQUEST_FILE, msg)
     # Someone wants to know who our predecessor is
     elif msg_type == c_msg.GET_PREDECESSOR:
         msg = dict()
@@ -153,8 +150,14 @@ def ctrlMsgReceived():
         myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
     # Someone wants a file from us
     elif msg_type == c_msg.REQUEST_FILE:
-        myLogger.mnPrint(msg['filename'] + " requested from " + addr[0])
-        sendFile(addr[0], msg['filename'])
+	# send directly to client	
+	if msg["client_ip"] is not None:
+		sendFile(msg["client_ip"], msg["filename"])
+		myLogger.mnPrint(msg['filename'] + " requested from " + msg["client_ip"])
+	# send to node who requested it
+	else:
+        	myLogger.mnPrint(msg['filename'] + " requested from " + addr[0])
+        	sendFile(addr[0], msg['filename'])
 
     # We are supposed to insert a file into the network
     elif msg_type == c_msg.INSERT_FILE:
@@ -162,16 +165,19 @@ def ctrlMsgReceived():
         outstanding_file_reqs[filename] = c_msg.OP_SEND_FILE
         fileNode = ChordNode(filename)
         myLogger.mnPrint("Inserting " + str(fileNode))
-        # TODO: instead of me.ip, addr[0] (when we have client)
+        # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
         findSuccessor(fileNode.chord_id, me.ip, filename=filename)
     # We are supposed to retrieve a file from the network
     elif msg_type == c_msg.GET_FILE:
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
         fileNode = ChordNode(filename)
+	client_ip = None
+	if "client_ip" in msg:
+		client_ip = msg["client_ip"]
         myLogger.mnPrint("Retrieving " + str(fileNode))
-        # TODO: instead of me.ip, addr[0] (when we have client)
-        findSuccessor(fileNode.chord_id, me.ip, filename=filename)
+        # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
+	findSuccessor(fileNode.chord_id, me.ip, filename=filename,client_ip=client_ip)
     elif msg_type == c_msg.GET_FILE_LIST:
         pass
 
@@ -209,7 +215,7 @@ def join():
 
 # Find the ip of the chord node that should succeed the given key
 # If filename is specified, this is for inserting a file
-def findSuccessor(key, target, filename="",finger=None):
+def findSuccessor(key, target, filename="",finger=None,client_ip=None):
     global successor
 
     # If key is somewhere between self and self.successor, then self.successor directly succeeds key
@@ -219,6 +225,7 @@ def findSuccessor(key, target, filename="",finger=None):
         msg['suc_ip'] = successor.ip
         msg['filename'] = filename
         msg['finger'] = finger
+	msg["client_ip"] = client_ip
         sendCtrlMsg(target, c_msg.RETURN_SUCCESSOR, msg)
     # Otherwise, send request to successor
     else:
@@ -235,6 +242,8 @@ def findSuccessor(key, target, filename="",finger=None):
         msg['key'] = key
         msg['target'] = target
         msg['filename'] = filename
+	msg['finger'] = finger
+	msg["client_ip"] = client_ip
         sendCtrlMsg(dst.ip, c_msg.FIND_SUCCESSOR, msg)
 
 # Find the node in { {me} U finger_table } that preceeds the given key closest
@@ -421,7 +430,7 @@ if __name__ == "__main__":
     # Install timer to run processes
     # TODO: use threading for this, since this will prob break other things
     signal.signal(signal.SIGALRM, handle_alrm)
-    signal.alarm(1)
+    signal.alarm(5)
 
     # Multiplexing lists
     rlist = [control_sock, file_listen_sock]

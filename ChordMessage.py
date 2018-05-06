@@ -1,20 +1,20 @@
 class ChordMessage():
 	# Message types
-	FIND_SUCCESSOR = "1"        # Propogate a find successor message
-	RETURN_SUCCESSOR = "2"      # Return the result of a find successor query
-	GET_PREDECESSOR = "3"       # Request a node's predecessor
-	RETURN_PREDECESSOR = "4"    # Return your predecessor
-	NOTIFY_PREDECESSOR = "5"    # Notify node that you are its predecessor
-	CHECK_ALIVE = "6"           # Request a validation that you are alive
-	AM_ALIVE = "7"              # Return alive validation
-	SEND_FILE = "8"             # Forward a file to a node
-	REQUEST_FILE = "9"          # Request a file from a node (or client)
+	FIND_SUCCESSOR = "FIND_SUCCESSOR"        	# Propogate a find successor message
+	RETURN_SUCCESSOR = "RETURN_SUCCESSOR"       # Return the result of a find successor query
+	GET_PREDECESSOR = "GET_PREDECESSOR"       	# Request a node's predecessor
+	RETURN_PREDECESSOR = "RETURN_PREDECESSOR"   # Return your predecessor
+	NOTIFY_PREDECESSOR = "NOTIFY_PREDECESSOR"   # Notify node that you are its predecessor
+	CHECK_ALIVE = "NOTIFY_PREDECESSOR"          # Request a validation that you are alive
+	AM_ALIVE = "AM_ALIVE"              			# Return alive validation
+	SEND_FILE = "SEND_FILE"             		# Forward a file to a node
+	REQUEST_FILE = "REQUEST_FILE"          		# Request a file from a node (or client)
 
 	# Message types specific to Tracker/Client interactions
-	INSERT_FILE = "INSERT"
-	GET_FILE = "GET"
-	GET_FILE_LIST = "LIST"
-	ERR = "13"
+	INSERT_FILE = "INSERT"						# Insert a file
+	GET_FILE = "GET"							# Get a file
+	GET_FILE_LIST = "LIST"						# List available files
+	ERR = "ERR"									# Error
 
 	# Network file operations
 	OP_SEND_FILE = "SEND"

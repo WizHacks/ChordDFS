@@ -37,6 +37,9 @@ class ChordDFSTopo(Topo):
 			# clean the directories
 			else:
 				for root, dirs, files in os.walk("nodes", topdown=False):
+					# dont delete the files dir
+					if dirs == "files":
+						continue
 					for file in files:
 						os.remove(os.path.join(root,file))
 		ixpfabric = self.addSwitch('sw1')

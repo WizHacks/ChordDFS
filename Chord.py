@@ -73,6 +73,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
+    myLogger.mnPrint("msg type:{0} sent to {1}".format(msg_type, dst_ip))
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -80,7 +81,8 @@ def ctrlMsgReceived():
 
     # Get data from socket
     try:
-        data, addr = control_sock.recvfrom(1024)
+        data, addr = control_sock.recvfrom(1024)myLogger.mnPrint("msg type:{0} sent to {1}".format(msg_type, dst_ip))
+        myLogger.mnPrint("msg type:{0} rcvd from {1}".format(msg_type, addr[0]))
     except socket.error as e:
         print(e)
         return

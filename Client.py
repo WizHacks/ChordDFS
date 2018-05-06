@@ -82,19 +82,20 @@ class Client():
 	'''Helper methods'''
 	def processRequest(self, request, args=None):
 		'''
-		Have the player client make a request
-		request: the request to make
+		process a request
+		request: the request to process
 		arg: arg for request
 		'''
 		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))
+		block = True
 		if request == c_msg.GET_FILE:
 			self.get_file(args[0])
 		elif request == c_msg.INSERT_FILE:
 			self.insert_file(args[0])
+			block = False
 		elif request == c_msg.GET_FILE_LIST:
 			self.get_file_list()			
-		else:
-			pass
+		return block
 
 	def sendMessage(self, msg_type, msg):
 		'''Send message to tracker node
@@ -115,11 +116,14 @@ class Client():
 		'''
 		list own directory
 		'''
+		# TODO: list own directory
 		pass
+
 	def processResponse(self, data, addr):
 		msg = json.loads(str(data))
 		msg_type = msg['msg_type']
 		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
+		# TODO: handle responses
 
 '''utility functions'''
 def exit(arg=None):
@@ -172,6 +176,7 @@ def help():
 	'''
 	Prints the help menu
 	'''
+	# TODO: write help statements
 	print("help request")
 	sys.stdout.flush()
 
@@ -216,10 +221,11 @@ if __name__ == "__main__":
 		args = cmds_to_run.pop(0).split(" ")
 		if len(args) != 0 and args[0] != "":
 			cmd = args[0].upper().strip()					
-			me.processRequest(cmd, args[1:])
-			ctrlMsgReceived()
+			block = me.processRequest(cmd, args[1:])
+			if block:
+				ctrlMsgReceived()
 	# prevent broken pipe
-        exit()
+        exit()	
 
     # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	

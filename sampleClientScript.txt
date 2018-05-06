@@ -1,0 +1,3 @@
+get temp.txt
+get 1.txt
+insert temp.txt

@@ -7,6 +7,7 @@ import signal
 import socket
 import struct
 import sys
+import threading
 import time
 import os
 
@@ -74,7 +75,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, msg))
+    #myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, msg))
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -90,13 +91,13 @@ def ctrlMsgReceived():
     # Parse message type and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
-    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
+    #myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:
         key = msg['key']
         target = msg['target']
-        filename = msg['filename']
+        #filename = msg['filename']
         findSuccessor(key, target, msg)
     # Someone returned our find successor query
     # TODO: since have 1 successor, ie, other nodes in ring, try to find rest of successors for successor list
@@ -183,7 +184,7 @@ def ctrlMsgReceived():
         pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
-def handle_alrm(signum, frame):
+def refresh():
     global successor, predecessor, refresh_rate
 
     # Will get our successor's predecessor and call stabilize on return
@@ -198,7 +199,9 @@ def handle_alrm(signum, frame):
     if predecessor != None:
         checkPredecessor()
 
-    signal.alarm(refresh_rate)
+    # Reset timer
+    timer = threading.Timer(refresh_rate, refresh)
+    timer.start()
 
 # Determine if the given key is between the two given endpoints
 def keyInRange(key, start_id, end_id, inc_end=False):
@@ -278,6 +281,7 @@ def notify(node):
         predecessor = node
         myLogger.mnPrint("Predecessor updated by notify: " + str(predecessor))
         # TODO: transfer all keys/files whose ids < node.chord_id to node
+        # TODO: transfer successor list to predecessor
 
 def fixFingers():
     '''Refresh the finger table entries periodicially'''
@@ -292,9 +296,10 @@ def checkPredecessor():
     pass
 
 def sendFile(dst_ip, msg):    
-    # TODO: open TCP connection using a thread or fork
-    # TODO: load content from file, check file exists  
-    filename = msg["filename"]  
+    # TODO: load content from file, check file exists
+    filename = msg["filename"]
+    #with open(file_dir_path+filename) as f:
+    #    msg['content'] = f.read()
     myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
     # TODO: only remove entry after successful send
@@ -349,27 +354,9 @@ if __name__ == "__main__":
         exit()
     my_ip = sys.argv[1]
     my_name = sys.argv[2]
-    me = ChordNode(my_ip,my_name)
+    me = ChordNode(my_ip, name=my_name)
 
     log_file_path = "nodes/{0}/logs/{1}.log".format(me.name, me.ip.replace(".", "_"))
-
-    # this is done in mininet upon creation of nodes
-    '''# Create directory for this node
-    node_directory = "nodes/" + me.name
-    if not os.path.exists(node_directory):
-        os.makedirs(node_directory)
-
-    # Create/clear log file
-    log_file_path = "nodes/{0}/logs/{1}.log".format(me.name, me.ip.replace(".", "_"))
-    with open(log_file_path, "w") as logFile:
-        logFile.write("")
-
-    # Create files directory for this node
-    file_dir_path = node_directory + "/files"
-    if not os.path.exists(file_dir_path):
-        os.makedirs(file_dir_path)
-    '''
-	
     node_directory = "nodes/" + me.name    
     file_dir_path = node_directory + "/files/chord/"    
 
@@ -409,7 +396,7 @@ if __name__ == "__main__":
 
     # successor list
     # TODO: store up to num_successor -> needed for failure and replication
-    successors = []    
+    successors = [successor]
 
     # Tracker creates the network, and is thus its own successor
     if is_tracker:
@@ -427,9 +414,8 @@ if __name__ == "__main__":
         fixFingers()    
 
     # Install timer to run processes
-    # TODO: use threading for this, since this will prob break other things
-    signal.signal(signal.SIGALRM, handle_alrm)
-    signal.alarm(refresh_rate)
+    timer = threading.Timer(refresh_rate, refresh)
+    timer.start()
 
     # Multiplexing lists
     rlist = [control_sock, file_listen_sock]

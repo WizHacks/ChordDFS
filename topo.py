@@ -19,7 +19,7 @@ class ChordDFSTopo(Topo):
 	def __init__(self, num_nodes):
 		"""Initialize a ChordDFS topology with num_nodes nodes, configure their IP
 		addresses and paths to their private directories"""
-		Topo.__init__(self)     
+		Topo.__init__(self)
 
 		chordDFSHosts = []
 

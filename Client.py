@@ -252,6 +252,7 @@ if __name__ == "__main__":
     			block = me.processRequest(cmd, args[1:])
     			if block:
     				ctrlMsgReceived()
+			time.sleep(2)
     	# prevent broken pipe
     	exit()	
 

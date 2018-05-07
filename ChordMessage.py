@@ -9,6 +9,7 @@ class ChordMessage():
 	AM_ALIVE = "AM_ALIVE"              	    	# Return alive validation
 	SEND_FILE = "SEND_FILE"             	    # Forward a file to a node
 	REQUEST_FILE = "REQUEST_FILE"          	    # Request a file from a node (or client)
+	SEND_SUCCESSORS = "SEND_SUCCESSORS"
 
 	# Message types specific to Tracker/Client interactions
 	INSERT_FILE = "INSERT"						# Insert a file

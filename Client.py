@@ -8,6 +8,7 @@ import fcntl
 
 from ReadLog import MyLogger
 from ChordMessage import ChordMessage as c_msg
+from ChordMessage import newMsgDict
 
 class Client():
 	'''
@@ -41,7 +42,8 @@ class Client():
 
 		except:
 		    pass        
-
+		# file directory
+		self.file_dir_path = "nodes/{0}/files/client/".format(self.name)    
 		# logging
 		log_file_path = "nodes/{0}/logs/{1}_c.log".format(self.name, self.ip.replace(".", "_"))
 		# create logger
@@ -57,27 +59,35 @@ class Client():
 	def insert_file(self, filename):
 		''' Insert a file
 		'''
-		content = ""
-		with open("nodes/{0}/files/client/{1}".format(self.name, filename)) as f_in:
-			content = f_in.read()
-			msg = dict()
-			msg['filename'] = filename
-			msg['content'] = content
-			self.sendMessage(c_msg.INSERT_FILE, msg)	
+		self.last_request = c_msg.INSERT_FILE
+		try:
+			with open(self.file_dir_path+filename) as f_in:
+				content = f_in.read()
+				msg = newMsgDict()
+				msg['filename'] = filename
+				msg['content'] = content
+				self.sendMessage(c_msg.INSERT_FILE, msg)				
+		except IOError as e:
+			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
+			self.myLogger.mnPrint(e)
 
 	def get_file(self, filename):
 		'''Request a file
 		'''
-		msg = dict()
+		self.last_request = c_msg.GET_FILE	
+		msg = newMsgDict()
 		msg['filename'] = filename
 		msg["client_ip"] = self.ip
-		self.sendMessage(c_msg.GET_FILE, msg)		
+		self.sendMessage(c_msg.GET_FILE, msg)	
+		
 
 	def get_file_list(self):
 		'''Request available files
 		'''
-		msg = dict()        
-		self.sendMessage(c_msg.GET_FILE_LIST, msg)	
+		self.last_request = c_msg.GET_PREDECESSOR	
+		msg = newMsgDict()        
+		self.sendMessage(c_msg.GET_FILE_LIST, msg)
+		
 
 	'''Helper methods'''
 	def processRequest(self, request, args=None):
@@ -95,6 +105,8 @@ class Client():
 			block = False
 		elif request == c_msg.GET_FILE_LIST:
 			self.get_file_list()			
+		elif request == "LS":
+			self.list_dir()
 		return block
 
 	def sendMessage(self, msg_type, msg):
@@ -116,14 +128,25 @@ class Client():
 		'''
 		list own directory
 		'''
-		# TODO: list own directory
-		pass
+		files = os.listdir(self.file_dir_path)		
+		for f in files:
+			print(f)
+		sys.stdout.flush()
 
 	def processResponse(self, data, addr):
 		msg = json.loads(str(data))
 		msg_type = msg['msg_type']
 		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
-		# TODO: handle responses
+		# We are supposed to find target's successor
+		if msg_type == c_msg.SEND_FILE:
+			filename = msg["filename"]
+			content = msg["content"]
+			with open(self.file_dir_path+filename, "w") as newFile:
+				newFile.write(content)
+			self.myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+		if msg_type == c_msg.ERR:
+			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
+		# TODO: handle file list
 
 '''utility functions'''
 def exit(arg=None):
@@ -134,7 +157,7 @@ def exit(arg=None):
 	sys.exit()
 
 def ctrlMsgReceived():
-	''''''
+	'''Handle received a msg from control socket'''
 	global me
 	# Get data from socket
 	try:
@@ -176,8 +199,14 @@ def help():
 	'''
 	Prints the help menu
 	'''
-	# TODO: write help statements
-	print("help request")
+	help_str = '''Chord Client Application v1.0 
+	insert file    insert file into Chord Ring
+	get file       get file from Chord Ring
+	list           list all available files in Chord Ring
+	exit           exit application
+	help           print help screen
+	'''
+	print(help_str)
 	sys.stdout.flush()
 
 if __name__ == "__main__":	
@@ -198,8 +227,7 @@ if __name__ == "__main__":
     script = None	
     if len(sys.argv) == 4:
     	script = sys.argv[3]	
-	
-	
+		
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # Socket specifically for accepting file transfer connections

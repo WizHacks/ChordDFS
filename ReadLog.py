@@ -13,12 +13,13 @@ class MyLogger():
     def mnPrint(self, msg):
         if self.client:
             # Format msg
-             msg = "<{0}_c>: {1}".format(self.ip, msg)
+            msg = "<{0}_c>: {1}".format(self.ip, msg)
         else:
             # Format msg
             msg = "<{0}>: {1}".format(self.ip, msg)
 
         # Print msg to stdout
+        # TODO: figure out what to do with IOERROR
         print(msg)
         sys.stdout.flush() # need to flush output, else never show up
 

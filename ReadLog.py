@@ -19,7 +19,6 @@ class MyLogger():
             msg = "<{0}>: {1}".format(self.ip, msg)
 
         # Print msg to stdout
-        # TODO: figure out what to do with IOERROR
         print(msg)
         sys.stdout.flush() # need to flush output, else never show up
 
@@ -27,14 +26,27 @@ class MyLogger():
         with open(self.log_file_path, "a") as logFile:
             logFile.write("{0} {1}\n".format(str(datetime.now()).replace(" ", "_"), msg))
 
+    def pretty_msg(self, msg):
+        '''Only print key,value pairs where value is not None'''
+        pretty = ""
+        for key, value in msg.items():
+            if value is not None:
+                pretty += "{{0}:{1},".format(key,value)
+        pretty +="}"
+        return pretty
+
 if __name__ == "__main__":
     # Get every file in logs folder
-    logFileNames = os.listdir("logs")
+    logFileNames = []
+    for root, dirs, files in os.walk("nodes", topdown=False):
+        for f in files:
+            if f.endswith(".log"):
+                logFileNames.append(os.path.join(root, f))
 
     # Get all entries from log files
     entries = []
     for logFileName in logFileNames:
-        logFile = open("logs/" + logFileName)
+        logFile = open(logFileName)
         for line in logFile:
             timestamp = line.strip().split(" ", 1)[0]
             timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H:%M:%S.%f")

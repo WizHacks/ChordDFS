@@ -16,18 +16,16 @@ class Client():
 	ip: ip of the client
 	name: name of the client	
 	'''
-	def __init__(self, ip, name, control_sock, file_listen_sock):
+	def __init__(self, ip, name, control_sock):
         # Chord Nodes can be used for network nodes or files
 		self.ip = ip        
 		self.name = name
 		self.last_request = None
 		self.control_sock = control_sock
-		self.file_listen_sock = file_listen_sock
 
 		# Default parameters    
 		self.tracker_node_ip = "172.1.1.1"
 		self.control_port = 500
-		self.file_listen_port = 501
 
 		try:
 		    # Open config file
@@ -38,7 +36,6 @@ class Client():
 		    # Load parameters from config file        
 		    self.tracker_node_ip = config['tracker_node_ip']
 		    self.control_port = config['control_port']
-		    self.file_listen_port = config['file_listen_port']
 
 		except:
 		    pass        
@@ -230,15 +227,11 @@ if __name__ == "__main__":
 		
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # Socket specifically for accepting file transfer connections
-    file_listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # set up client
-    me = Client(my_ip, my_name, control_sock, file_listen_sock)	
+    me = Client(my_ip, my_name, control_sock)	
 
-    control_sock.bind((me.ip, me.control_port))
-    file_listen_sock.bind((me.ip, me.file_listen_port))
-    file_listen_sock.listen(5)	        
+    control_sock.bind((me.ip, me.control_port))          
 
     # script --> blocking
     if script is not None:
@@ -252,13 +245,13 @@ if __name__ == "__main__":
     			block = me.processRequest(cmd, args[1:])
     			if block:
     				ctrlMsgReceived()
-			time.sleep(2)
+    		time.sleep(1)
     	# prevent broken pipe
     	exit()	
 
     # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	
-    rlist = [control_sock, file_listen_sock, sys.stdin]
+    rlist = [control_sock, sys.stdin]
     wlist = []
     xlist = []		
 
@@ -273,7 +266,4 @@ if __name__ == "__main__":
 	        ctrlMsgReceived()
 
 	    if sys.stdin in _rlist:
-	    	processStdin()    
-
-	    if file_listen_sock in _rlist:
-	        pass		
+	    	processStdin()    		

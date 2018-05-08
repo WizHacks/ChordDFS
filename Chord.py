@@ -28,8 +28,8 @@ class ChordNode:
         self.chord_id = get_hash(key) % ring_size
 
     def __str__(self):
-	if self.name == "":
-		return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)		
+        if self.name == "":
+            return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)
         return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
 
 
@@ -44,13 +44,13 @@ class ChordNode:
     def print_finger_table(self, finger_table):
         ''' Print entries in finger table
         '''
-	text = "\n"
+        text = "\n"
         index = 0
-	print(finger_table.keys())
+        print(finger_table.keys())
         for key,value in sorted(finger_table.items()):
             text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
             index +=1
-	return text
+        return text
 
 
 # Get the hash of a key
@@ -75,7 +75,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    #myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, msg))
+    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, myLogger.pretty_msg(msg)))
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -91,7 +91,7 @@ def ctrlMsgReceived():
     # Parse message type and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
-    #myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
+    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], myLogger.pretty_msg(msg)))
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:
@@ -173,13 +173,9 @@ def ctrlMsgReceived():
     elif msg_type == c_msg.GET_FILE:
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
-        fileNode = ChordNode(filename)
-	client_ip = None
-	if "client_ip" in msg:
-		client_ip = msg["client_ip"]
-        myLogger.mnPrint("Retrieving " + str(fileNode))
-        # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
-	findSuccessor(fileNode.chord_id, me.ip, msg)
+        fileNode = ChordNode(filename)                
+        myLogger.mnPrint("Retrieving " + str(fileNode))            
+        findSuccessor(fileNode.chord_id, me.ip, msg)
     elif msg_type == c_msg.GET_FILE_LIST:
         pass
 
@@ -297,9 +293,7 @@ def checkPredecessor():
 
 def sendFile(dst_ip, msg):    
     # TODO: load content from file, check file exists
-    filename = msg["filename"]
-    #with open(file_dir_path+filename) as f:
-    #    msg['content'] = f.read()
+    filename = msg["filename"]    
     myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
     # TODO: only remove entry after successful send
@@ -320,7 +314,6 @@ if __name__ == "__main__":
     finger_table_size = 6
     tracker_node_ip = "172.1.1.1"
     control_port = 500
-    file_listen_port = 501
     using_finger_table = False
     num_successors = 1
     refresh_rate = 1
@@ -334,8 +327,7 @@ if __name__ == "__main__":
         # Load parameters from config file
         finger_table_size = config['finger_table_size']
         tracker_node_ip = config['tracker_node_ip']
-        control_port = config['control_port']
-        file_listen_port = config['file_listen_port']
+        control_port = config['control_port']        
         using_finger_table = config['using_finger_table']
         num_successors = config['num_successors']
         refresh_rate = config["refresh_rate"]
@@ -380,11 +372,6 @@ if __name__ == "__main__":
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     control_sock.bind((me.ip, control_port))
 
-    # Socket specifically for accepting file transfer connections
-    file_listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    file_listen_sock.bind((me.ip, file_listen_port))
-    file_listen_sock.listen(5)
-
     # Name of every file that we are responsible for
     entries = []
 
@@ -418,7 +405,7 @@ if __name__ == "__main__":
     timer.start()
 
     # Multiplexing lists
-    rlist = [control_sock, file_listen_sock]
+    rlist = [control_sock]
     wlist = []
     xlist = []
 
@@ -436,10 +423,7 @@ if __name__ == "__main__":
             continue
 
         if control_sock in _rlist:
-            ctrlMsgReceived()
-
-        if file_listen_sock in _rlist:
-            pass
+            ctrlMsgReceived()    
 
         for ift in incoming_file_transfers:
             if ift[0] in _rlist:

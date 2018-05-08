@@ -35,6 +35,7 @@ class ChordDFSTopo(Topo):
 				os.makedirs("nodes/n{0}/files/client".format(node+1))
 				os.makedirs("nodes/n{0}/logs".format(node+1))
 			# clean the directories
+			# TODO: let's delete all files in the chord folders
 			else:
 				for root, dirs, files in os.walk("nodes", topdown=False):
 					# dont delete the files dir	

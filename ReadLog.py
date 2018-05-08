@@ -3,11 +3,11 @@ import os
 import sys
 
 class MyLogger():
-    def __init__(self, ip, log_file_path, client=False):     
+    def __init__(self, ip, chord_id, log_file_path, client=False):     
         self.ip = ip   
-        self.log_file_path = log_file_path        
+        self.chord_id = chord_id
+        self.log_file_path = log_file_path
         self.client = client
-
 
     # Print that will show up in mininet output and get added to log file
     def mnPrint(self, msg):
@@ -16,7 +16,7 @@ class MyLogger():
             msg = "<{0}_c>: {1}".format(self.ip, msg)
         else:
             # Format msg
-            msg = "<{0}>: {1}".format(self.ip, msg)
+            msg = "<{0}, {1}>: {2}".format(self.ip, self.chord_id, msg)
 
         # Print msg to stdout
         # TODO: figure out what to do with IOERROR

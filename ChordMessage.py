@@ -5,11 +5,12 @@ class ChordMessage():
 	GET_PREDECESSOR = "GET_PREDECESSOR"         # Request a node's predecessor
 	RETURN_PREDECESSOR = "RETURN_PREDECESSOR"   # Return your predecessor
 	NOTIFY_PREDECESSOR = "NOTIFY_PREDECESSOR"   # Notify node that you are its predecessor
-	CHECK_ALIVE = "NOTIFY_PREDECESSOR"          # Request a validation that you are alive
+	CHECK_ALIVE = "CHECK_ALIVE"          		# Request a validation that you are alive
 	AM_ALIVE = "AM_ALIVE"              	    	# Return alive validation
 	SEND_FILE = "SEND_FILE"             	    # Forward a file to a node
 	REQUEST_FILE = "REQUEST_FILE"          	    # Request a file from a node (or client)
-	SEND_SUCCESSORS = "SEND_SUCCESSORS"
+	SOMEONE_DIED = "SOMEONE_DIED"				# Inform that we are aware of a node that has died
+	LEAVING = "LEAVING"							# Inform that we are leaving the network
 
 	# Message types specific to Tracker/Client interactions
 	INSERT_FILE = "INSERT"						# Insert a file
@@ -37,4 +38,5 @@ def newMsgDict():
 	msg['target'] = None
 	msg['pred_ip'] = None
 	msg['content'] = None
+	msg['hash_index'] = None
 	return msg

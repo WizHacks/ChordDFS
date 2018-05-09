@@ -31,8 +31,8 @@ class ChordNode:
             self.chord_id = get_hash(key) % ring_size
 
     def __str__(self):
-	if self.name == "":
-		return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)		
+        if self.name == "":
+            return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)
         return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
 
     def generate_fingers(self, finger_table_size):
@@ -46,14 +46,12 @@ class ChordNode:
     def print_finger_table(self, finger_table):
         ''' Print entries in finger table
         '''
-	    text = "\n"
+        text = "\n"
         index = 0
-	    print(finger_table.keys())
+        print(finger_table.keys())
         for key,value in sorted(finger_table.items()):
             text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
             index +=1
-	    return text
-
 
 # Get the hash of a key
 def get_hash(key, numHashes=1):
@@ -82,11 +80,11 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    #myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, msg))
+    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, myLogger.pretty_msg(msg)))
 
 # Received a UDP message
 def ctrlMsgReceived():
-    global successor, predecessor, entries, outstanding_file_reqs, finger_table, inNetwork
+    global successor, predecessor, entries, outstanding_file_reqs, finger_table, tracker_node_ip, inNetwork
 
     # Get data from socket
     try:
@@ -99,10 +97,11 @@ def ctrlMsgReceived():
     if not inNetwork:
         return
 
-    # Parse message type and respond accordingly
+    # Parse message type, update hops, and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
-    #myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
+    msg["hops"] += 1
+    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], myLogger.pretty_msg(msg)))
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:
@@ -162,6 +161,11 @@ def ctrlMsgReceived():
             newFile.write(content)
         entries[filename] = ChordNode(filename)
         myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+        # is file from the client -> tell them insertion was successful
+        if msg["client_ip"] != None:
+            sendCtrlMsg(msg["client_ip"], c_msg.INSERT_FILE, msg)
+        # current responsible entries
+        myLogger.mnPrint("Entries: {0}".format(entries.keys()))
     # Someone wants a file from us
     elif msg_type == c_msg.REQUEST_FILE:
         # Send directly to client
@@ -192,9 +196,7 @@ def ctrlMsgReceived():
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_SEND_FILE
         fileNode = ChordNode(filename, isFile=True)
-        myLogger.mnPrint("Inserting " + str(fileNode))
-        # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
-        #           depends, should we send the file through the tracker node? or send it directly from the client
+        myLogger.mnPrint("Inserting " + str(fileNode))       
         # TODO: check client_ip, if it exists then this is from the client, else is for reinserting a file on node failure
         for chord_id in fileNode.chord_id:
             findSuccessor(fileNode.chord_id, me.ip, msg)
@@ -203,13 +205,16 @@ def ctrlMsgReceived():
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
         fileNode = ChordNode(filename, isFile=True)
-        client_ip = None
-        if "client_ip" in msg:
-            client_ip = msg["client_ip"]
-            myLogger.mnPrint("Retrieving " + str(fileNode))
+        myLogger.mnPrint("Retrieving " + str(fileNode))
         # TODO: do a timeout, and if we don't get a response go onto next id
         findSuccessor(fileNode.chord_id[0], me.ip, msg)
+    # send all known entries back to client if tracker
     elif msg_type == c_msg.GET_FILE_LIST:
+        if me.ip == tracker_node_ip:
+            msg["file_list"] = entries.keys()
+            sendCtrlMsg(msg["client_ip"], c_msg.GET_FILE_LIST, msg)
+    # TODO: when will this happen?
+    elif msg_type == c_msg.ERR:
         pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
@@ -397,20 +402,28 @@ def fixFingers():
         msg["finger"] = key
         findSuccessor(key, me.ip, msg)
 
+def checkPredecessor():
+    pass
+
 # Send a file to a node
 def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):    
     filename = msg['filename']
     if readFromFile:
-        with open(file_dir_path+filename) as f:
-            msg['content'] = f.read()
+        try:
+            with open(file_dir_path+filename) as f:
+                msg['content'] = f.read()
+        except IOError as e:
+            sendCtrlMsg(dst_ip, c_msg.ERR, msg)
+            self.myLogger.mnPrint("Error: {0} not found!".format(filename))
+            self.myLogger.mnPrint(e)
+            return
     if rmEntry:
         if filename in entries:
             del entries[filename]
             # TODO: delete file
         else:
             mnPrint(filename + " not found in entries")
-    
-    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
+    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)    
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
 
 def exit(arg=None):
@@ -425,7 +438,6 @@ if __name__ == "__main__":
     finger_table_size = 6
     tracker_node_ip = "172.1.1.1"
     control_port = 500
-    file_listen_port = 501
     using_finger_table = False
     num_successors = 1
     refresh_rate = 1
@@ -439,8 +451,7 @@ if __name__ == "__main__":
         # Load parameters from config file
         finger_table_size = config['finger_table_size']
         tracker_node_ip = config['tracker_node_ip']
-        control_port = config['control_port']
-        file_listen_port = config['file_listen_port']
+        control_port = config['control_port']        
         using_finger_table = config['using_finger_table']
         num_successors = config['num_successors']
         refresh_rate = config["refresh_rate"]
@@ -465,8 +476,6 @@ if __name__ == "__main__":
     log_file_path = "nodes/{0}/logs/{1}.log".format(me.name, me.ip.replace(".", "_"))
     node_directory = "nodes/" + me.name    
     file_dir_path = node_directory + "/files/chord/"    
-
-    # TODO: clear out files -> should we?
 
     # Get tracker based on ip from config
     tracker = ChordNode(tracker_node_ip)
@@ -528,7 +537,7 @@ if __name__ == "__main__":
     timer.start()
 
     # Multiplexing lists
-    rlist = [control_sock, file_listen_sock]
+    rlist = [control_sock]
     wlist = []
     xlist = []
 
@@ -541,4 +550,3 @@ if __name__ == "__main__":
 
         if control_sock in _rlist:
             ctrlMsgReceived()
-        

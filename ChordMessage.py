@@ -17,6 +17,7 @@ class ChordMessage():
 	GET_FILE = "GET"							# Get a file
 	GET_FILE_LIST = "LIST"						# List available files	
 	ERR = "ERR"									# Error
+	SUCCESS = "SUCCESS"							# Successful transaction
 
 	# Network file operations
 	OP_SEND_FILE = "SEND"
@@ -39,4 +40,6 @@ def newMsgDict():
 	msg['pred_ip'] = None
 	msg['content'] = None
 	msg['hash_index'] = None
+	msg["file_list"] = None
+	msg["hops"] = 0
 	return msg

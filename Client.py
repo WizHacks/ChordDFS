@@ -16,18 +16,16 @@ class Client():
 	ip: ip of the client
 	name: name of the client	
 	'''
-	def __init__(self, ip, name, control_sock, file_listen_sock):
+	def __init__(self, ip, name, control_sock):
         # Chord Nodes can be used for network nodes or files
 		self.ip = ip        
 		self.name = name
 		self.last_request = None
 		self.control_sock = control_sock
-		self.file_listen_sock = file_listen_sock
 
 		# Default parameters    
 		self.tracker_node_ip = "172.1.1.1"
 		self.control_port = 500
-		self.file_listen_port = 501
 
 		try:
 		    # Open config file
@@ -38,7 +36,6 @@ class Client():
 		    # Load parameters from config file        
 		    self.tracker_node_ip = config['tracker_node_ip']
 		    self.control_port = config['control_port']
-		    self.file_listen_port = config['file_listen_port']
 
 		except:
 		    pass        
@@ -47,7 +44,7 @@ class Client():
 		# logging
 		log_file_path = "nodes/{0}/logs/{1}_c.log".format(self.name, self.ip.replace(".", "_"))
 		# create logger
-		self.myLogger = MyLogger(self.ip, log_file_path)
+		self.myLogger = MyLogger(self.ip, self.name, log_file_path, client=True)
 
 		# Announce initialization
 		self.myLogger.mnPrint("Hi! I'm a chord client, my IP is {0}".format(self.ip, self.name))        
@@ -59,13 +56,15 @@ class Client():
 	def insert_file(self, filename):
 		''' Insert a file
 		'''
-		self.last_request = c_msg.INSERT_FILE
+		self.last_request = c_msg.INSERT_FILE + " " + filename
 		try:
 			with open(self.file_dir_path+filename) as f_in:
 				content = f_in.read()
 				msg = newMsgDict()
 				msg['filename'] = filename
 				msg['content'] = content
+				msg['client_ip'] = self.ip
+				msg["hops"] = 0
 				self.sendMessage(c_msg.INSERT_FILE, msg)				
 		except IOError as e:
 			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
@@ -74,18 +73,21 @@ class Client():
 	def get_file(self, filename):
 		'''Request a file
 		'''
-		self.last_request = c_msg.GET_FILE	
+		self.last_request = c_msg.GET_FILE + " " + filename	
 		msg = newMsgDict()
 		msg['filename'] = filename
 		msg["client_ip"] = self.ip
+		msg["hops"] = 0
 		self.sendMessage(c_msg.GET_FILE, msg)	
 		
 
 	def get_file_list(self):
 		'''Request available files
 		'''
-		self.last_request = c_msg.GET_PREDECESSOR	
+		self.last_request = c_msg.GET_FILE_LIST	
 		msg = newMsgDict()        
+		msg["client_ip"] = self.ip
+		msg["hops"] = 0
 		self.sendMessage(c_msg.GET_FILE_LIST, msg)
 		
 
@@ -96,18 +98,15 @@ class Client():
 		request: the request to process
 		arg: arg for request
 		'''
-		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))
-		block = True
+		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))		
 		if request == c_msg.GET_FILE:
 			self.get_file(args[0])
 		elif request == c_msg.INSERT_FILE:
-			self.insert_file(args[0])
-			block = False
+			self.insert_file(args[0])			
 		elif request == c_msg.GET_FILE_LIST:
 			self.get_file_list()			
 		elif request == "LS":
-			self.list_dir()
-		return block
+			self.list_dir()		
 
 	def sendMessage(self, msg_type, msg):
 		'''Send message to tracker node
@@ -122,12 +121,12 @@ class Client():
 
 		# Send the message to the destination's control port
 		self.control_sock.sendto(msg_json, (self.tracker_node_ip, self.control_port))
-		self.myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, self.tracker_node_ip, msg))
+		self.myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, self.tracker_node_ip, self.myLogger.pretty_msg(msg)))
 
 	def list_dir(self):
 		'''
 		list own directory
-		'''
+		'''		
 		files = os.listdir(self.file_dir_path)		
 		for f in files:
 			print(f)
@@ -136,17 +135,31 @@ class Client():
 	def processResponse(self, data, addr):
 		msg = json.loads(str(data))
 		msg_type = msg['msg_type']
-		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
-		# We are supposed to find target's successor
+		msg["hops"] += 1
+		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], self.myLogger.pretty_msg(msg)))
+		# file from server
 		if msg_type == c_msg.SEND_FILE:
 			filename = msg["filename"]
 			content = msg["content"]
 			with open(self.file_dir_path+filename, "w") as newFile:
 				newFile.write(content)
 			self.myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+			self.list_dir()
+		# success for last request
+		if msg_type == c_msg.INSERT_FILE:
+			self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))			
+		# error for last request
 		if msg_type == c_msg.ERR:
 			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
 		# TODO: handle file list
+		if msg_type == c_msg.GET_FILE_LIST:
+			self.myLogger.mnPrint("Server Files:\n{0}".format(self.print_dir(msg["file_list"])))
+
+	def print_dir(self, dir):
+		str = ""
+		for f in dir:
+			str += "{0}\n".format(f)	
+		return str[:-1]	
 
 '''utility functions'''
 def exit(arg=None):
@@ -230,15 +243,11 @@ if __name__ == "__main__":
 		
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # Socket specifically for accepting file transfer connections
-    file_listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # set up client
-    me = Client(my_ip, my_name, control_sock, file_listen_sock)	
+    me = Client(my_ip, my_name, control_sock)	
 
-    control_sock.bind((me.ip, me.control_port))
-    file_listen_sock.bind((me.ip, me.file_listen_port))
-    file_listen_sock.listen(5)	        
+    control_sock.bind((me.ip, me.control_port))          
 
     # script --> blocking
     if script is not None:
@@ -249,16 +258,15 @@ if __name__ == "__main__":
     		args = cmds_to_run.pop(0).split(" ")
     		if len(args) != 0 and args[0] != "":
     			cmd = args[0].upper().strip()					
-    			block = me.processRequest(cmd, args[1:])
-    			if block:
-    				ctrlMsgReceived()
-			time.sleep(2)
+    			me.processRequest(cmd, args[1:])
+    			ctrlMsgReceived()
+    		time.sleep(1)
     	# prevent broken pipe
     	exit()	
 
     # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)	
-    rlist = [control_sock, file_listen_sock, sys.stdin]
+    rlist = [control_sock, sys.stdin]
     wlist = []
     xlist = []		
 
@@ -273,7 +281,4 @@ if __name__ == "__main__":
 	        ctrlMsgReceived()
 
 	    if sys.stdin in _rlist:
-	    	processStdin()    
-
-	    if file_listen_sock in _rlist:
-	        pass		
+	    	processStdin()    		

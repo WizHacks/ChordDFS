@@ -472,8 +472,8 @@ def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):
                 msg['content'] = f.read()
         except IOError as e:
             sendCtrlMsg(dst_ip, c_msg.ERR, msg)
-            self.myLogger.mnPrint("Error: {0} not found!".format(filename))
-            self.myLogger.mnPrint(e)
+            myLogger.mnPrint("Error: {0} not found!".format(filename))
+            myLogger.mnPrint(e)
             return
     if rmEntry:
         if filename in entries:

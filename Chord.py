@@ -257,6 +257,9 @@ def ctrlMsgReceived():
         if me.ip == tracker_node_ip:
             msg["file_list"] = allFiles.keys()
             sendCtrlMsg(msg["client_ip"], c_msg.GET_FILE_LIST, msg)
+    # TODO: avgs keys per node
+    elif msg_type == c_msg.ENTRIES:
+        pass
     # TODO: when will this happen?
     elif msg_type == c_msg.ERR:
         pass

@@ -151,9 +151,9 @@ class Client():
 			self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))			
 		# error for last request
 		if msg_type == c_msg.ERR:
-			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))	
+			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))				
 			# retry 3x then give up		
-			if self.retries < 4:
+			if self.retries < 3:
 				self.retries +=1
 				self.myLogger.mnPrint("Retrying attempt: {0}".format(self.retries))
 				self.processRequest(self.last_request[0], self.last_request[-1])

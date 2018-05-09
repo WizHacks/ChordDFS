@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sys
+import re
 
 class MyLogger():
     def __init__(self, ip, chord_id, log_file_path, client=False):     
@@ -35,6 +36,69 @@ class MyLogger():
         pretty = pretty[:-1] + "}"
         return pretty
 
+# functions for main application
+def help():
+    help_str = '''Chord Log Application v1.0 
+    ring           print chord ring    
+    exit           exit application
+    help           print help screen
+    '''
+
+def ring():
+    global log_str
+    chord_ring = ""
+    # find chord ids
+    ring_re = re.compile(r"chord_id is [0-9]+")
+    # get chord ids
+    num_re = re.compile(r'[0-9]+')
+    # sort ids
+    nodes = sorted(list(map(int,num_re.findall("".join(ring_re.findall(log_str))))))
+    for node in nodes:
+        chord_ring += "{0}->".format(node)
+    chord_ring += str(nodes[0])
+    return chord_ring
+
+def start():
+    global sorted_entries
+    return sorted_entries[0]["time"]
+
+def end():
+    global sorted_entries
+    return sorted_entries[-1]["time"]
+    
+def report():
+    global log_str
+    # report of log summaries etc
+    report_str = \
+    '''
+    Start: {0}\n\
+    End: {1}\n\
+    Number of Nodes: {2}\n\
+    Ring: {3}\n\
+    Stabilization Time: {4}\n\
+    '''.format(start(),end(),num_nodes(),ring(),stabilize())
+    return report_str
+
+def stabilize():
+    global log_str
+    # example 2018-05-06_19:17:52.324541 <172.1.1.1>: Successor updated by stabilize
+    stabilize_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+.[0-9]+.[0-9]+.[0-9]>: Successor updated by stabilize")    
+    times_stab = stabilize_re.findall(log_str)
+    time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")
+    times = time_re.findall("".join(times_stab))
+    start = datetime.strptime(times[0],"%H:%M:%S.%f")
+    end = datetime.strptime(times[-1],"%H:%M:%S.%f")
+    total = end - start
+    final = "{0} sec".format(total.total_seconds())
+    return final
+
+def num_nodes():
+    global log_str    
+    # find chord ids
+    ring_re = re.compile(r"chord_id is [0-9]+")
+    nodes = ring_re.findall(log_str)
+    return len(nodes)
+
 if __name__ == "__main__":
     # Get every file in logs folder
     logFileNames = []
@@ -56,6 +120,33 @@ if __name__ == "__main__":
             entries.append(entry)
         logFile.close()
     
+    log_str = ""
+    sorted_entries = sorted(entries, key=lambda e: e['time'])
     # Print all entries in order
-    for entry in sorted(entries, key=lambda e: e['time']):
-        print(entry['log'])
+    for entry in sorted_entries:
+        log_str += entry['log'] + "\n"        
+
+    # same compiled logs into 1    
+    with open("master.log", "w") as f_out:
+        f_out.write(log_str)
+
+    input_str = ""    
+
+    while True:
+        input_str = input("Enter a command: ")
+        if input_str == "help":
+            help()
+        if input_str == "exit":
+            break
+        if input_str == "ring":
+            print(ring())
+        if input_str == "start":
+            print(start())
+        if input_str == "end":
+            print(end())
+        if input_str == "stabilize":
+            print(stabilize())
+        if input_str == "num_nodes":
+            print(num_nodes())
+        if input_str == "report":
+            print(report())

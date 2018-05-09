@@ -11,7 +11,7 @@ class MyLogger():
         self.client = client
 
     # Print that will show up in mininet output and get added to log file
-    def mnPrint(self, msg):
+    def mnPrint(self, msg, debug=True):
         if self.client:
             # Format msg
             msg = "<{0}_c>: {1}".format(self.ip, msg)
@@ -19,9 +19,10 @@ class MyLogger():
             # Format msg
             msg = "<{0}, {1}>: {2}".format(self.ip, self.chord_id, msg)
 
-        # Print msg to stdout
-        print(msg)
-        sys.stdout.flush() # need to flush output, else never show up
+        # Print msg to stdout 
+        if debug:  
+            print(msg)
+            sys.stdout.flush() # need to flush output, else never show up
 
         # Write msg to log file        
         with open(self.log_file_path, "a") as logFile:
@@ -74,6 +75,8 @@ def end():
 def report():
     global log_str
     # report of log summaries etc
+    inserts_str = inserts()
+    gets_str = gets()
     report_str = \
     '''
     Start: {0}\n\
@@ -82,16 +85,21 @@ def report():
     # Clients: {3}\n\
     Ring: {4}\n\
     Stabilization Time: {5}\n\
-    '''.format(start(),end(),servers(),clients(),ring(),stabilize())
+    # Inserts: {6}\n\
+    Inserts Avg Hops: {7}\n\
+    # Gets: {8}\n\
+    Gets Avg Hops: {9}\n\
+    '''.format(start(),end(),servers(),clients(),ring(),stabilize(),\
+        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1])
     return report_str
 
 def stabilize():
     global log_str
-    # example 2018-05-06_19:17:52.324541 <172.1.1.1>: Successor updated by stabilize
-    stabilize_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+.[0-9]+.[0-9]+.[0-9]>: Successor updated by stabilize")    
+    # example 2018-05-09_10:40:34.210800 <172.1.1.3, 11>: Successor updated by stabilize: key: 172.1.1.4, chord id: 47
+    stabilize_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+.[0-9]+.[0-9]+.[0-9], [0-9]+>: Successor updated by stabilize")    
     times_stab = stabilize_re.findall(log_str)
-    time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")
-    times = time_re.findall("".join(times_stab))
+    time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")    
+    times = time_re.findall("".join(times_stab))    
     start = datetime.strptime(times[0],"%H:%M:%S.%f")
     end = datetime.strptime(times[-1],"%H:%M:%S.%f")
     total = end - start
@@ -108,43 +116,102 @@ def servers():
 def clients():
     global log_str    
     # find clients    
+    # ex: I'm a chord client, my IP is 172.1.1.2
+    ring_re = re.compile(r"chord client, my IP is [0-9]+.[0-9]+.[0-9]+.[0-9]+")
+    ip_re = re.compile(r"[0-9]+.[0-9]+.[0-9]+.[0-9]")    
+    nodes = ip_re.findall("".join(ring_re.findall(log_str)))
+    return len(nodes)
+
+def inserts():
+    global log_str
+    '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
+    insert_re = re.compile(r"<[0-9]+.[0-9]+.[0-9]+.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
+    inserts = insert_re.findall(log_str)
+    num_inserts = len(inserts)
+    hops_re = re.compile(r"hops:[0-9]+")
+    hops = hops_re.findall("".join(inserts))
+    num_re = re.compile(r'[0-9]+')
+    hops_nums = list(map(int,num_re.findall("".join(hops))))
+    if len(hops_nums) == 0:
+        avg_hops = 0
+    else:
+        avg_hops = sum(hops_nums)/len(hops_nums)
+    inserts_str = (num_inserts,avg_hops)
+    return inserts_str
+
+def gets():
+    global log_str
+    '''2018-05-09_10:41:42.752116 <172.1.1.2_c>: msg type:SEND_FILE rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:SEND_FILE,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''    
+    get_re = re.compile(r"<[0-9]+.[0-9]+.[0-9]+.[0-9]+_c>: msg type:SEND_FILE.*hops:[0-9]+")
+    gets = get_re.findall(log_str)
+    num_gets = len(gets)
+    hops_re = re.compile(r"hops:[0-9]+")
+    hops = hops_re.findall("".join(gets))
+    num_re = re.compile(r'[0-9]+')
+    hops_nums = list(map(int,num_re.findall("".join(hops))))
+    if len(hops_nums) == 0:
+        avg_hops = 0
+    else:
+        avg_hops = sum(hops_nums)/len(hops_nums)
+    gets_str = (num_gets,avg_hops)
+    return gets_str
+
+def keys():
     return "TODO"
 
-if __name__ == "__main__":
+if __name__ == "__main__":       
     # Get every file in logs folder
     logFileNames = []
     for root, dirs, files in os.walk("nodes", topdown=False):
         for f in files:
             if f.endswith(".log"):
-                logFileNames.append(os.path.join(root, f))
-
+                logFileNames.append(os.path.join(root, f))               
     # Get all entries from log files
     entries = []
     for logFileName in logFileNames:
         logFile = open(logFileName)
         for line in logFile:
             timestamp = line.strip().split(" ", 1)[0]
-            timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H:%M:%S.%f")
+            # skip non timestamps
+            try:
+                timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H:%M:%S.%f")
+            except:
+                continue
             entry = dict()
             entry['time'] = timestamp
             entry['log'] = line
             entries.append(entry)
-        logFile.close()
-    
+        logFile.close()     
     log_str = ""
     sorted_entries = sorted(entries, key=lambda e: e['time'])
     # Print all entries in order
+    # update = 0
+    # iter = 0
     for entry in sorted_entries:
-        log_str += entry['log'] + "\n"        
+        # update += 1
+        # if update == 1000:
+        #     iter += 1
+        #     print(iter)
+        #     update = 0
+        log_str += entry['log']        
 
-    # same compiled logs into 1    
-    with open("master.log", "w") as f_out:
-        f_out.write(log_str)
-
+    # same compiled logs into 1  
+    try:  
+        with open("master.log", "w") as f_out:
+            f_out.write(log_str)  
+    except:
+        pass        
     input_str = ""    
+    # just run the report
+    if len(sys.argv) > 1:        
+        print(report())
+        sys.stdout.flush()
+        sys.exit(1)
 
     while True:
         input_str = input("Enter a command: ")
+        sys.stdout.flush()
+
         if input_str == "help":
             help()
         if input_str == "exit":
@@ -163,3 +230,12 @@ if __name__ == "__main__":
             print(clients())
         if input_str == "report":
             print(report())
+        if input_str == "inserts":
+            inserts_str = inserts()
+            print("Inserts: {0}\nAvg Hops: {1}".format(inserts_str[0],inserts_str[1]))
+        if input_str == "gets":
+            gets_str = gets()
+            print("Gets: {0}\nAvg Hops: {1}".format(gets_str[0],gets_str[1]))
+        if input_str == "keys":
+            print(keys())
+        sys.stdout.flush()

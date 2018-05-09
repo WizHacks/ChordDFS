@@ -78,7 +78,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
     
     # Send the message to the destination's control port
     control_sock.sendto(msg_json, (dst_ip, control_port))
-    #myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, myLogger.pretty_msg(msg)))
+    myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, dst_ip, myLogger.pretty_msg(msg)), debug=False)
 
 # Received a UDP message
 def ctrlMsgReceived():
@@ -99,7 +99,7 @@ def ctrlMsgReceived():
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
     msg["hops"] += 1
-    #myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], myLogger.pretty_msg(msg)))
+    myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], myLogger.pretty_msg(msg)), debug=False)
 
     # We are supposed to find target's successor
     if msg_type == c_msg.FIND_SUCCESSOR:

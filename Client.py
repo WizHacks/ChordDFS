@@ -26,6 +26,7 @@ class Client():
 		# Default parameters    
 		self.tracker_node_ip = "172.1.1.1"
 		self.control_port = 500
+		self.retries = 0
 
 		try:
 		    # Open config file
@@ -56,7 +57,7 @@ class Client():
 	def insert_file(self, filename):
 		''' Insert a file
 		'''
-		self.last_request = c_msg.INSERT_FILE + " " + filename
+		self.last_request = [c_msg.INSERT_FILE, filename]
 		try:
 			with open(self.file_dir_path+filename) as f_in:
 				content = f_in.read()
@@ -73,7 +74,7 @@ class Client():
 	def get_file(self, filename):
 		'''Request a file
 		'''
-		self.last_request = c_msg.GET_FILE + " " + filename	
+		self.last_request = [c_msg.GET_FILE,filename]	
 		msg = newMsgDict()
 		msg['filename'] = filename
 		msg["client_ip"] = self.ip
@@ -84,7 +85,7 @@ class Client():
 	def get_file_list(self):
 		'''Request available files
 		'''
-		self.last_request = c_msg.GET_FILE_LIST	
+		self.last_request = [c_msg.GET_FILE_LIST]	
 		msg = newMsgDict()        
 		msg["client_ip"] = self.ip
 		msg["hops"] = 0
@@ -150,8 +151,12 @@ class Client():
 			self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))			
 		# error for last request
 		if msg_type == c_msg.ERR:
-			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
-		# TODO: handle file list
+			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))	
+			# retry 3x then give up		
+			if self.retries < 4:
+				self.retries +=1
+				self.myLogger.mnPrint("Retrying attempt: {0}".format(self.retries))
+				self.processRequest(self.last_request[0], self.last_request[-1])
 		if msg_type == c_msg.GET_FILE_LIST:
 			self.myLogger.mnPrint("Server Files:\n{0}".format(self.print_dir(msg["file_list"])))
 

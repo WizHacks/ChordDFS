@@ -40,8 +40,7 @@ class ChordDFSTopo(Topo):
 				for root, dirs, files in os.walk("nodes", topdown=False):
 					# dont delete the files dir	
 					split_path = root.split("/")			
-					if split_path[-1] != "client"\
-					and split_path[-1] != "chord":						
+					if split_path[-1] != "client":
 						for f in files:
 							os.remove(os.path.join(root,f))
 		ixpfabric = self.addSwitch('sw1')

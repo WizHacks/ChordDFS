@@ -22,6 +22,7 @@ class ChordMessage():
 	# Network file operations
 	OP_SEND_FILE = "SEND"
 	OP_REQ_FILE = "REQUEST"
+	OP_INSERT_FILE = "INSERT"
 
 	# MISC
 	EXIT = "EXIT"
@@ -39,7 +40,7 @@ def newMsgDict():
 	msg['target'] = None
 	msg['pred_ip'] = None
 	msg['content'] = None
-	msg['hash_index'] = None
+	msg['hash'] = None
 	msg["file_list"] = None
 	msg["hops"] = 0
 	return msg

@@ -40,6 +40,11 @@ class MyLogger():
 def help():
     help_str = '''Chord Log Application v1.0 
     ring           print chord ring    
+    stabilize      get stabilization time
+    start          application start time
+    end            application end time
+    servers        number of server nodes
+    clients        number of client nodes
     exit           exit application
     help           print help screen
     '''
@@ -73,10 +78,11 @@ def report():
     '''
     Start: {0}\n\
     End: {1}\n\
-    Number of Nodes: {2}\n\
-    Ring: {3}\n\
-    Stabilization Time: {4}\n\
-    '''.format(start(),end(),num_nodes(),ring(),stabilize())
+    # Servers: {2}\n\
+    # Clients: {3}\n\
+    Ring: {4}\n\
+    Stabilization Time: {5}\n\
+    '''.format(start(),end(),servers(),clients(),ring(),stabilize())
     return report_str
 
 def stabilize():
@@ -92,12 +98,17 @@ def stabilize():
     final = "{0} sec".format(total.total_seconds())
     return final
 
-def num_nodes():
+def servers():
     global log_str    
     # find chord ids
     ring_re = re.compile(r"chord_id is [0-9]+")
     nodes = ring_re.findall(log_str)
     return len(nodes)
+
+def clients():
+    global log_str    
+    # find clients    
+    return "TODO"
 
 if __name__ == "__main__":
     # Get every file in logs folder
@@ -146,7 +157,9 @@ if __name__ == "__main__":
             print(end())
         if input_str == "stabilize":
             print(stabilize())
-        if input_str == "num_nodes":
-            print(num_nodes())
+        if input_str == "servers":
+            print(servers())
+        if input_str == "clients":
+            print(clients())
         if input_str == "report":
             print(report())

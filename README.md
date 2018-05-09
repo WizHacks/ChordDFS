@@ -24,6 +24,7 @@ n3 python Client.py n3 \n3 script.txt 		# n3 run client with script, no i/o
 	a) insert - node that inserts file sends msg to client
 	b) get - node that has file sends msg to client
 	c) list - tracker node sends msg to client
+2a) number of clients
 3) Avg number of keys per node vs total number of keys
 4) Time till convergence after stabilization (new node joins) vs num of nodes in network (initial)
 

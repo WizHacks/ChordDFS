@@ -20,11 +20,12 @@ n3 python Client.py n3 \n3 script.txt 		# n3 run client with script, no i/o
 
 ## Measurements
 1) Time till stabilization vs num of nodes in network (initial)
-2) Client ops avg hops vs number of nodes in network (after stabilization)
+2a) Client (single) ops avg hops vs number of nodes in network (after stabilization)
 	a) insert - node that inserts file sends msg to client
 	b) get - node that has file sends msg to client
 	c) list - tracker node sends msg to client
-2a) number of clients
+2b) number of clients (multiple)
+2c) compare using find successor vs using finger table
 3) Avg number of keys per node vs total number of keys
 4) Time till convergence after stabilization (new node joins) vs num of nodes in network (initial)
 

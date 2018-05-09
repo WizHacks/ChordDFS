@@ -108,7 +108,11 @@ def servers():
 def clients():
     global log_str    
     # find clients    
-    return "TODO"
+    # ex: I'm a chord client, my IP is 172.1.1.2
+    ring_re = re.compile(r"chord client, my IP is [0-9]+.[0-9]+.[0-9]+.[0-9]+")
+    ip_re = re.compile(r"[0-9]+.[0-9]+.[0-9]+.[0-9]")    
+    nodes = ip_re.findall("".join(ring_re.findall(log_str)))
+    return len(nodes)
 
 if __name__ == "__main__":
     # Get every file in logs folder
@@ -163,3 +167,4 @@ if __name__ == "__main__":
             print(clients())
         if input_str == "report":
             print(report())
+        sys.stdout.flush()

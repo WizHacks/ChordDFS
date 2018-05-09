@@ -126,7 +126,7 @@ def ctrlMsgReceived():
         # Filename indicates we wanted to find a file's location
         else:
             fileNode = ChordNode(filename, isFile=True)
-            myLogger.mnPrint("Found file ({0}) at ({1})".format(fileNode, ChordNode(suc_ip)))
+            myLogger.mnPrint("Found file ({0}) ({1}) at ({2})".format(fileNode, msg['key'], ChordNode(suc_ip)))
             if outstanding_file_reqs[filename] == c_msg.OP_SEND_FILE:
                 # When we get to this point, assume that file content is already present in msg
                 sendFile(suc_ip, msg)
@@ -301,10 +301,12 @@ def refresh():
             if waitingForAlive(predecessor.ip):
                 myLogger.mnPrint("Our predecessor {0} has died!".format(predecessor))
                 predecessor = None
-            # Check to see if the predecessor is still alive
             else:
+                # Check to see if the predecessor is still alive
                 waiting_for_alive_resp[predecessor.ip] = True
                 sendCtrlMsg(predecessor.ip, c_msg.CHECK_ALIVE, newMsgDict())
+                # Send any files that shouldn't be here to the predecessor
+                sendFilesToPred()
 
         '''
         counter += 1
@@ -426,6 +428,23 @@ def stabilize(x):
     msg['pred_ip'] = me.ip
     sendCtrlMsg(successor.ip, c_msg.NOTIFY_PREDECESSOR, msg)
 
+# Send all necessary files to our predecessor
+def sendFilesToPred():
+    for f, cn in list(entries.items()):
+        # For each chord_id for this file
+        k_count = 0
+        for k in cn.chord_id:
+            # Count if this key should belong to us
+            if keyInRange(k, predecessor.chord_id, me.chord_id, inc_end=True):
+                k_count += 1
+
+        # Send file to predecessor if none of the keys were for us
+        if k_count == 0:
+            myLogger.mnPrint("Transferring file ({0}) to predecessor ({1}) from file balancing".format(cn, predecessor))
+            msg = newMsgDict()
+            msg['filename'] = f
+            sendFile(predecessor.ip, msg, readFromFile=True, rmEntry=True)
+
 # Node told us that it is our predecessor
 def notify(node):
     global predecessor
@@ -441,15 +460,18 @@ def notify(node):
             k_count = 0
             for k in cn.chord_id:
                 # Count if this key should move to the new predecessor
-                if keyInRange(k, predecessor.chord_id, node.chord_id, inc_end=True):
+                if predecessor is None:
+                    if keyInRange(k, me.chord_id, node.chord_id, inc_end=True):
+                        k_count += 1
+                elif keyInRange(k, predecessor.chord_id, node.chord_id, inc_end=True):
                     k_count += 1
 
             # Send file to predecessor if necessary, rm this entry if all keys should go to predecessor
             if k_count > 0:
-                myLogger.mnPrint("Transferring file ({0}) to predecessor ({1})".format(cn, predecessor))
+                myLogger.mnPrint("Transferring file ({0}) to new predecessor ({1}) from notify".format(cn, node))
                 msg = newMsgDict()
                 msg['filename'] = f
-                sendFile(predecessor.ip, msg, readFromFile=True, rmEntry=(k_count==num_replicates))
+                sendFile(node.ip, msg, readFromFile=True, rmEntry=(k_count==num_replicates))
 
         predecessor = node
         waiting_for_alive_resp[predecessor.ip] = False

@@ -41,6 +41,7 @@ def newMsgDict():
 	msg['pred_ip'] = None
 	msg['content'] = None
 	msg['hash'] = None
+	msg['dead_node'] = None
 	msg["file_list"] = None
 	msg["hops"] = 0
 	return msg

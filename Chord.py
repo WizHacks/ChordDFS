@@ -84,7 +84,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
 
 # Received a UDP message
 def ctrlMsgReceived():
-    global successor, predecessor, entries, outstanding_file_reqs, finger_table
+    global successor, predecessor, entries, outstanding_file_reqs, finger_table, tracker_node_ip
 
     # Get data from socket
     try:
@@ -93,9 +93,10 @@ def ctrlMsgReceived():
         print(e)
         return
     
-    # Parse message type and respond accordingly
+    # Parse message type, update hops, and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
+    msg["hops"] += 1
     myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], myLogger.pretty_msg(msg)))
 
     # We are supposed to find target's successor
@@ -156,6 +157,11 @@ def ctrlMsgReceived():
             newFile.write(content)
         entries[filename] = ChordNode(filename)
         myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+        # is file from the client -> tell them insertion was successful
+        if msg["client_ip"] != None:
+            sendCtrlMsg(msg["client_ip"], c_msg.INSERT_FILE, msg)
+        # current responsible entries
+        myLogger.mnPrint("Entries: {0}".format(entries.keys()))
     # Someone wants a file from us
     elif msg_type == c_msg.REQUEST_FILE:
         # Send directly to client
@@ -186,9 +192,7 @@ def ctrlMsgReceived():
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_SEND_FILE
         fileNode = ChordNode(filename)
-        myLogger.mnPrint("Inserting " + str(fileNode))
-        # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
-        #           depends, should we send the file through the tracker node? or send it directly from the client
+        myLogger.mnPrint("Inserting " + str(fileNode))       
         # TODO: check client_ip, if it exists then this is from the client, else is for reinserting a file on node failure
         findSuccessor(fileNode.chord_id, me.ip, msg)
     # We are supposed to retrieve a file from the network
@@ -198,7 +202,13 @@ def ctrlMsgReceived():
         fileNode = ChordNode(filename)                
         myLogger.mnPrint("Retrieving " + str(fileNode))            
         findSuccessor(fileNode.chord_id, me.ip, msg)
+    # send all known entries back to client if tracker
     elif msg_type == c_msg.GET_FILE_LIST:
+        if me.ip == tracker_node_ip:
+            msg["file_list"] = entries.keys()
+            sendCtrlMsg(msg["client_ip"], c_msg.GET_FILE_LIST, msg)
+    # TODO: when will this happen?
+    elif msg_type == c_msg.ERR:
         pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
@@ -371,16 +381,21 @@ def checkPredecessor():
 def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):    
     filename = msg['filename']
     if readFromFile:
-        with open(file_dir_path+filename) as f:
-            msg['content'] = f.read()
+        try:
+            with open(file_dir_path+filename) as f:
+                msg['content'] = f.read()
+        except IOError as e:
+            sendCtrlMsg(dst_ip, c_msg.ERR, msg)
+            self.myLogger.mnPrint("Error: {0} not found!".format(filename))
+            self.myLogger.mnPrint(e)
+            return
     if rmEntry:
         if filename in entries:
             del entries[filename]
             # TODO: delete file
         else:
             mnPrint(filename + " not found in entries")
-
-    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
+    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)    
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
 
 def exit(arg=None):

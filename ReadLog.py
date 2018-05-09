@@ -28,11 +28,11 @@ class MyLogger():
 
     def pretty_msg(self, msg):
         '''Only print key,value pairs where value is not None'''
-        pretty = ""
+        pretty = "{"
         for key, value in msg.items():
             if value is not None:
-                pretty += "{{0}:{1},".format(key,value)
-        pretty +="}"
+                pretty += "{0}:{1},".format(key,value)
+        pretty = pretty[:-1] + "}"
         return pretty
 
 if __name__ == "__main__":

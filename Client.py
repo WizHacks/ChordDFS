@@ -44,7 +44,7 @@ class Client():
 		# logging
 		log_file_path = "nodes/{0}/logs/{1}_c.log".format(self.name, self.ip.replace(".", "_"))
 		# create logger
-		self.myLogger = MyLogger(self.ip, log_file_path)
+		self.myLogger = MyLogger(self.ip, self.name, log_file_path, client=True)
 
 		# Announce initialization
 		self.myLogger.mnPrint("Hi! I'm a chord client, my IP is {0}".format(self.ip, self.name))        
@@ -56,13 +56,15 @@ class Client():
 	def insert_file(self, filename):
 		''' Insert a file
 		'''
-		self.last_request = c_msg.INSERT_FILE
+		self.last_request = c_msg.INSERT_FILE + " " + filename
 		try:
 			with open(self.file_dir_path+filename) as f_in:
 				content = f_in.read()
 				msg = newMsgDict()
 				msg['filename'] = filename
 				msg['content'] = content
+				msg['client_ip'] = self.ip
+				msg["hops"] = 0
 				self.sendMessage(c_msg.INSERT_FILE, msg)				
 		except IOError as e:
 			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
@@ -71,18 +73,21 @@ class Client():
 	def get_file(self, filename):
 		'''Request a file
 		'''
-		self.last_request = c_msg.GET_FILE	
+		self.last_request = c_msg.GET_FILE + " " + filename	
 		msg = newMsgDict()
 		msg['filename'] = filename
 		msg["client_ip"] = self.ip
+		msg["hops"] = 0
 		self.sendMessage(c_msg.GET_FILE, msg)	
 		
 
 	def get_file_list(self):
 		'''Request available files
 		'''
-		self.last_request = c_msg.GET_PREDECESSOR	
+		self.last_request = c_msg.GET_FILE_LIST	
 		msg = newMsgDict()        
+		msg["client_ip"] = self.ip
+		msg["hops"] = 0
 		self.sendMessage(c_msg.GET_FILE_LIST, msg)
 		
 
@@ -93,18 +98,15 @@ class Client():
 		request: the request to process
 		arg: arg for request
 		'''
-		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))
-		block = True
+		self.myLogger.mnPrint("received request: {0}:{1}".format(request, args))		
 		if request == c_msg.GET_FILE:
 			self.get_file(args[0])
 		elif request == c_msg.INSERT_FILE:
-			self.insert_file(args[0])
-			block = False
+			self.insert_file(args[0])			
 		elif request == c_msg.GET_FILE_LIST:
 			self.get_file_list()			
 		elif request == "LS":
-			self.list_dir()
-		return block
+			self.list_dir()		
 
 	def sendMessage(self, msg_type, msg):
 		'''Send message to tracker node
@@ -119,12 +121,12 @@ class Client():
 
 		# Send the message to the destination's control port
 		self.control_sock.sendto(msg_json, (self.tracker_node_ip, self.control_port))
-		self.myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, self.tracker_node_ip, msg))
+		self.myLogger.mnPrint("msg type:{0} sent to {1}: msg:{2}".format(msg_type, self.tracker_node_ip, self.myLogger.pretty_msg(msg)))
 
 	def list_dir(self):
 		'''
 		list own directory
-		'''
+		'''		
 		files = os.listdir(self.file_dir_path)		
 		for f in files:
 			print(f)
@@ -133,17 +135,31 @@ class Client():
 	def processResponse(self, data, addr):
 		msg = json.loads(str(data))
 		msg_type = msg['msg_type']
-		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], msg))
-		# We are supposed to find target's successor
+		msg["hops"] += 1
+		self.myLogger.mnPrint("msg type:{0} rcvd from {1}: msg:{2}".format(msg_type, addr[0], self.myLogger.pretty_msg(msg)))
+		# file from server
 		if msg_type == c_msg.SEND_FILE:
 			filename = msg["filename"]
 			content = msg["content"]
 			with open(self.file_dir_path+filename, "w") as newFile:
 				newFile.write(content)
 			self.myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+			self.list_dir()
+		# success for last request
+		if msg_type == c_msg.INSERT_FILE:
+			self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))			
+		# error for last request
 		if msg_type == c_msg.ERR:
 			self.myLogger.mnPrint("Error: last request:{0} failed!".format(self.last_request))
 		# TODO: handle file list
+		if msg_type == c_msg.GET_FILE_LIST:
+			self.myLogger.mnPrint("Server Files:\n{0}".format(self.print_dir(msg["file_list"])))
+
+	def print_dir(self, dir):
+		str = ""
+		for f in dir:
+			str += "{0}\n".format(f)	
+		return str[:-1]	
 
 '''utility functions'''
 def exit(arg=None):
@@ -242,9 +258,8 @@ if __name__ == "__main__":
     		args = cmds_to_run.pop(0).split(" ")
     		if len(args) != 0 and args[0] != "":
     			cmd = args[0].upper().strip()					
-    			block = me.processRequest(cmd, args[1:])
-    			if block:
-    				ctrlMsgReceived()
+    			me.processRequest(cmd, args[1:])
+    			ctrlMsgReceived()
     		time.sleep(1)
     	# prevent broken pipe
     	exit()	

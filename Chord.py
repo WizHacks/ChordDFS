@@ -18,20 +18,22 @@ from ChordMessage import newMsgDict
 
 # Represents any object that has a place on the Chord ring
 class ChordNode:
-    def __init__(self, key, name=""):
+    def __init__(self, key, name="", isFile=False):
         # Chord Nodes can be used for network nodes or files
         self.ip = key
         self.filename = key
         self.name = name
         
         # Use hash to find position on ring
-        self.chord_id = get_hash(key) % ring_size
+        if isFile:
+            self.chord_id = [h % ring_size for h in get_hash(key, num_successors)]
+        else:
+            self.chord_id = get_hash(key) % ring_size
 
     def __str__(self):
 	if self.name == "":
 		return "key: {0}, chord id: {1}".format(self.ip, self.chord_id)		
         return "key: {0}, name: {1}, chord id: {2}".format(self.ip, self.name, self.chord_id)
-
 
     def generate_fingers(self, finger_table_size):
         ''' Generate skeleton fingers
@@ -44,13 +46,13 @@ class ChordNode:
     def print_finger_table(self, finger_table):
         ''' Print entries in finger table
         '''
-	text = "\n"
+	    text = "\n"
         index = 0
-	print(finger_table.keys())
+	    print(finger_table.keys())
         for key,value in sorted(finger_table.items()):
             text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
             index +=1
-	return text
+	    return text
 
 
 # Get the hash of a key
@@ -84,7 +86,7 @@ def sendCtrlMsg(dst_ip, msg_type, msg):
 
 # Received a UDP message
 def ctrlMsgReceived():
-    global successor, predecessor, entries, outstanding_file_reqs, finger_table
+    global successor, predecessor, entries, outstanding_file_reqs, finger_table, inNetwork
 
     # Get data from socket
     try:
@@ -93,6 +95,10 @@ def ctrlMsgReceived():
         print(e)
         return
     
+    # Drop all packets if we are not participating in the network
+    if not inNetwork:
+        return
+
     # Parse message type and respond accordingly
     msg = json.loads(str(data))
     msg_type = msg['msg_type']
@@ -185,30 +191,32 @@ def ctrlMsgReceived():
     elif msg_type == c_msg.INSERT_FILE:
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_SEND_FILE
-        fileNode = ChordNode(filename)
+        fileNode = ChordNode(filename, isFile=True)
         myLogger.mnPrint("Inserting " + str(fileNode))
         # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
         #           depends, should we send the file through the tracker node? or send it directly from the client
         # TODO: check client_ip, if it exists then this is from the client, else is for reinserting a file on node failure
-        findSuccessor(fileNode.chord_id, me.ip, msg)
+        for chord_id in fileNode.chord_id:
+            findSuccessor(fileNode.chord_id, me.ip, msg)
     # We are supposed to retrieve a file from the network
     elif msg_type == c_msg.GET_FILE:
         filename = msg['filename']
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
-        fileNode = ChordNode(filename)
+        fileNode = ChordNode(filename, isFile=True)
         client_ip = None
         if "client_ip" in msg:
             client_ip = msg["client_ip"]
             myLogger.mnPrint("Retrieving " + str(fileNode))
-            # TODO: instead of me.ip, addr[0] (when we have client) --> does client_ip solve this?
-            #       again, we could have the client directly receive the file, or go through the tracker first
-        findSuccessor(fileNode.chord_id, me.ip, msg)
+        # TODO: do a timeout, and if we don't get a response go onto next id
+        findSuccessor(fileNode.chord_id[0], me.ip, msg)
     elif msg_type == c_msg.GET_FILE_LIST:
         pass
 
 # This calls all methods that need to be called frequently to keep the network synchronized
 def refresh():
-    global successor, predecessor, refresh_rate
+    global successor, predecessor, refresh_rate, inNetwork
+
+    counter = 0
 
     while True:
         if successor != None:
@@ -216,7 +224,6 @@ def refresh():
             if waitingForAlive(successor.ip):
                 myLogger.mnPrint("Our successor {0} has died!".format(successor))
                 successor = me
-                #findSuccessor(me.chord_id, me.ip)
             # Will get our successor's predecessor and call stabilize on return
             else:
                 waiting_for_alive_resp[successor.ip] = True
@@ -240,6 +247,16 @@ def refresh():
                 waiting_for_alive_resp[predecessor.ip] = True
                 sendCtrlMsg(predecessor.ip, c_msg.CHECK_ALIVE, newMsgDict())
 
+        '''
+        counter += 1
+        if me.name == "n4" and counter >= 10:
+            counter = 0
+            if inNetwork:
+                leave()
+            else:
+                join()
+        '''
+
         # Wait for short time
         time.sleep(refresh_rate)
 
@@ -258,28 +275,39 @@ def keyInRange(key, start_id, end_id, inc_end=False):
 
 # Join the network by finding out who your successor is
 def join():
+    global inNetwork
+
+    inNetwork = True
     myLogger.mnPrint("Joining the network...")
     findSuccessor(me.chord_id, me.ip)
 
 # Leave the network gracefully
 def leave():
+    global inNetwork, predecessor, successor
+
+    inNetwork = False
     myLogger.mnPrint("Leaving the network...")
 
     # Send all of our current files to our successor
-    msg = newMsgDict()
-    for f in list(entries.keys()):
-        msg['filename'] = f
-        sendFile(successor.ip, msg, readFromFile=True, rmEntry=True)
+    if successor is not None:
+        msg = newMsgDict()
+        for f in list(entries.keys()):
+            msg['filename'] = f
+            sendFile(successor.ip, msg, readFromFile=True, rmEntry=True)
 
-    # Tell our successor we are leaving and pass them our predecessor
-    msg = newMsgDict()
-    msg['pred_ip'] = predecessor.ip
-    sendCtrlMsg(successor.ip, c_msg.LEAVING, msg)
+    if successor is not None and predecessor is not None:
+        # Tell our successor we are leaving and pass them our predecessor
+        msg = newMsgDict()
+        msg['pred_ip'] = predecessor.ip
+        sendCtrlMsg(successor.ip, c_msg.LEAVING, msg)
 
-    # Tell our predecessor we are leaving and pass them our successor
-    msg = newMsgDict()
-    msg['suc_ip'] = successor.ip
-    sendCtrlMsg(predecessor.ip, c_msg.LEAVING, msg)
+        # Tell our predecessor we are leaving and pass them our successor
+        msg = newMsgDict()
+        msg['suc_ip'] = successor.ip
+        sendCtrlMsg(predecessor.ip, c_msg.LEAVING, msg)
+
+    successor = None
+    predecessor = None
 
 # Find the ip of the chord node that should succeed the given key
 # If filename is specified, this is for finding a file location
@@ -458,12 +486,7 @@ if __name__ == "__main__":
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     control_sock.bind((me.ip, control_port))
 
-    # Socket specifically for accepting file transfer connections
-    file_listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    file_listen_sock.bind((me.ip, file_listen_port))
-    file_listen_sock.listen(5)
-
-    # Name of every file that we are responsible for
+    # Every file that we are responsible for (name->ChordNode)
     entries = dict()
 
     # Maps filename to operation we want to perform when we find its location in the ring ('send' or 'request')
@@ -475,19 +498,22 @@ if __name__ == "__main__":
     # Predecessor is null by default
     predecessor = None
 
-    # successor list
-    # TODO: store up to num_successor -> needed for failure and replication
-    #successors = [successor]
+    # If this node is part of the network
+    inNetwork = False
 
     # Tracker creates the network, and is thus its own successor
     if is_tracker:
+        inNetwork = True
         successor = me
     # Every other node is joining the network after the tracker
     else:
+        '''
         if me.name == "n4":
-            time.sleep(30)
+            time.sleep(15)
         else:
             time.sleep(1)
+        '''
+        time.sleep(1)
         successor = None
         join()
 
@@ -498,8 +524,6 @@ if __name__ == "__main__":
         fixFingers()    
 
     # Install timer to run processes
-    #timer = threading.Timer(refresh_rate, refresh)
-    #timer.start()
     timer = threading.Thread(target=refresh)
     timer.start()
 
@@ -507,12 +531,6 @@ if __name__ == "__main__":
     rlist = [control_sock, file_listen_sock]
     wlist = []
     xlist = []
-
-    # Keeps track of (sock, local_fd) pairs for each incoming file
-    incoming_file_transfers = []
-
-    # Keeps track of (sock, local_fd) pairs for each outgoing file
-    outgoing_file_transfers = []
 
     while True:
         # Multiplex on possible network messages
@@ -523,11 +541,4 @@ if __name__ == "__main__":
 
         if control_sock in _rlist:
             ctrlMsgReceived()
-
-        if file_listen_sock in _rlist:
-            pass
-
-        for ift in incoming_file_transfers:
-            if ift[0] in _rlist:
-                pass
         

@@ -18,6 +18,7 @@ class ChordMessage():
 	GET_FILE_LIST = "LIST"						# List available files	
 	ERR = "ERR"									# Error
 	SUCCESS = "SUCCESS"							# Successful transaction
+	ENTRIES = "ENTRIES"							# Get entries node is responsible for
 
 	# Network file operations
 	OP_SEND_FILE = "SEND"

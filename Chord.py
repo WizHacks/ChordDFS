@@ -52,6 +52,7 @@ class ChordNode:
         for key,value in sorted(finger_table.items()):
             text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
             index +=1
+        return text
 
 # Get the hash of a key
 def get_hash(key, numHashes=1):

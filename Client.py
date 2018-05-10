@@ -5,6 +5,7 @@ import select
 import sys
 import os
 import fcntl
+import threading
 
 from ReadLog import MyLogger
 from ChordMessage import ChordMessage as c_msg
@@ -157,7 +158,7 @@ class Client():
             with open(self.file_dir_path+filename, "w") as newFile:
                 newFile.write(content)
             self.myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
-            self.list_dir()
+            #self.list_dir()
         # success for last request
         if msg_type == c_msg.INSERT_FILE or msg_type == c_msg.ENTRIES:
             self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))            
@@ -190,7 +191,7 @@ def ctrlMsgReceived():
     '''Handle received a msg from control socket'''
     global me
     # Get data from socket
-    me.control_sock.settimeout(me.rate)
+    #me.control_sock.settimeout(me.rate)
     try:
         data, addr = me.control_sock.recvfrom(1024)
     except socket.error as e:
@@ -198,6 +199,21 @@ def ctrlMsgReceived():
         return
     # Parse message type and respond accordingly        
     me.processResponse(data,addr)
+
+def receiveMessages():
+    rlist = [control_sock]
+    wlist = []
+    xlist = []
+
+    while True:
+        # Multiplex on possible network messages
+        try:
+            _rlist, _wlist, _xlist = select.select(rlist, wlist, xlist)
+        except:
+            continue
+
+        if control_sock in _rlist:
+            ctrlMsgReceived()
 
 def processStdin():
     '''Process the stdin input and take appropriate action
@@ -270,6 +286,8 @@ if __name__ == "__main__":
 
     # script --> blocking
     if script is not None:
+        timer = threading.Thread(target=receiveMessages)
+        timer.start()
         cmds_to_run = []
         with open(script, "r") as f_in:
             cmds_to_run = f_in.read().strip().split("\n")
@@ -278,16 +296,16 @@ if __name__ == "__main__":
             if len(args) != 0 and args[0] != "":
                 cmd = args[0].upper().strip()                    
                 me.processRequest(cmd, args[1:])
-                ctrlMsgReceived()
+                #ctrlMsgReceived()
             time.sleep(me.rate)
         # prevent broken pipe
-        exit()    
+        exit()
 
     # Multiplexing lists
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fcntl.fcntl(sys.stdin, fcntl.F_GETFL) | os.O_NONBLOCK)    
     rlist = [control_sock, sys.stdin]
     wlist = []
-    xlist = []        
+    xlist = []
 
     while True:
         # Multiplex on possible network messages

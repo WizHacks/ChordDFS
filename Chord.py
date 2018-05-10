@@ -2,6 +2,7 @@ from datetime import datetime
 import hashlib
 import json
 import os
+import random
 import select
 import signal
 import socket
@@ -65,6 +66,10 @@ def get_hash(key, numHashes=1):
         hashList.append(struct.unpack("<L", hash_bytes[:4])[0])
 
     return hashList
+
+# Get the outcome of a random roll with probability p
+def bernoulli(p):
+    return random.uniform(0, 1) <= p
 
 # Send a UDP message to another node
 def sendCtrlMsg(dst_ip, msg_type, msg):
@@ -301,8 +306,6 @@ def ctrlMsgReceived():
 def refresh():
     global successor, predecessor, refresh_rate, inNetwork
 
-    counter = 0
-
     while True:
         if successor != None:
             # If we were waiting on a response from our successor and never got one, assume they died
@@ -314,7 +317,10 @@ def refresh():
                 sendCtrlMsg(tracker.ip, c_msg.SOMEONE_DIED, msg)
 
                 myLogger.mnPrint("Our successor {0} has died!".format(successor))
-                successor = tracker
+                waiting_for_alive_resp[successor.ip] = False
+                successor = None
+                findSuccessor(me.chord_id, me.ip)
+                successor = me
             # Will get our successor's predecessor and call stabilize on return
             else:
                 waiting_for_alive_resp[successor.ip] = True
@@ -329,6 +335,7 @@ def refresh():
             # If we were waiting on a response from our predecessor and never got one, assume they died
             if waitingForAlive(predecessor.ip):
                 myLogger.mnPrint("Our predecessor {0} has died!".format(predecessor))
+                waiting_for_alive_resp[predecessor.ip] = False
                 predecessor = None
             else:
                 # Check to see if the predecessor is still alive
@@ -337,15 +344,15 @@ def refresh():
                 # Send any files that shouldn't be here to the predecessor
                 sendFilesToPred()
 
-        
-        counter += 1
-        if me.name == "n4" and counter == 30:
-            #counter = 0
-            if inNetwork:
-                leave()
-            else:
-                join()
-        
+        # Nodes should randomly leave/join the network or fail outright
+        if not is_tracker:
+            if bernoulli(leave_join_prob):
+                if inNetwork:
+                    leave()
+                else:
+                    join()
+            #if bernoulli(fail_prob):
+            #    fail()
 
         # Wait for short time
         time.sleep(refresh_rate)
@@ -399,6 +406,16 @@ def leave():
     successor = None
     predecessor = None
 
+# Simulate this node crashing
+def fail():
+    global inNetwork, predecessor, successor
+    
+    myLogger.mnPrint("Failing...")
+
+    inNetwork = False
+    predecessor = None
+    successor = None
+
 # Find the ip of the chord node that should succeed the given key
 # If filename is specified, this is for finding a file location
 def findSuccessor(key, target, msg=None):
@@ -443,6 +460,9 @@ def closestPreceedingNode(key):
 # Given the returned predecessor of our successor, update if necessary and touch base with successor
 def stabilize(x):
     global successor
+
+    if successor is None:
+        return
 
     waiting_for_alive_resp[successor.ip] = False
 
@@ -560,6 +580,8 @@ if __name__ == "__main__":
     using_finger_table = False
     num_replicates = 1
     refresh_rate = 1
+    leave_join_prob = 0
+    fail_prob = 0
 
     try:
         # Open config file
@@ -570,10 +592,12 @@ if __name__ == "__main__":
         # Load parameters from config file
         finger_table_size = config['finger_table_size']
         tracker_node_ip = config['tracker_node_ip']
-        control_port = config['control_port']        
+        control_port = config['control_port']
         using_finger_table = config['using_finger_table']
         num_replicates = config['num_replicates']
-        refresh_rate = config["refresh_rate"]
+        refresh_rate = config['refresh_rate']
+        leave_join_prob = config['leave_join_prob']
+        fail_prob = config['fail_prob']
     except:
         pass
 
@@ -620,7 +644,7 @@ if __name__ == "__main__":
     # Every file on the network, only used by tracker (name->ChordNode)
     allFiles = dict()
 
-    # Maps filename to operation we want to perform when we find its location in the ring ('send' or 'request')
+    # Maps filename to operation we want to perform when we find its location in the ring ('send' or 'request' or 'insert')
     outstanding_file_reqs = dict()
 
     # If we are waiting for a certain node to tell us that it is alive
@@ -629,24 +653,18 @@ if __name__ == "__main__":
     # Predecessor is null by default
     predecessor = None
 
-    # If this node is part of the network
-    inNetwork = False
-
     # Tracker creates the network, and is thus its own successor
     if is_tracker:
         inNetwork = True
         successor = me
     # Every other node is joining the network after the tracker
     else:
-        '''
-        if me.name == "n4":
-            time.sleep(15)
-        else:
-            time.sleep(1)
-        '''
         time.sleep(1)
+        inNetwork = False
         successor = None
-        join()
+        # We want most nodes to join the network initially
+        if bernoulli(1 - leave_join_prob):
+            join()
 
     # up to m entries; me.name + 2^i
     if using_finger_table:

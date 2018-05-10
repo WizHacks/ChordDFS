@@ -336,7 +336,7 @@ def refresh():
         # Handle predecessor death
         if predecessor != None:
             # If we were waiting on a response from our predecessor and never got one, assume they died
-            if waitingForAlive(predecessor.ip):
+            if waitingForAlive(predecessor.ip) and predecessor.ip is not successor.ip:
                 myLogger.mnPrint("Our predecessor {0} has died!".format(predecessor))
                 waiting_for_alive_resp[predecessor.ip] = False
                 predecessor = None

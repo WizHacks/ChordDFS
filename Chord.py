@@ -51,7 +51,10 @@ class ChordNode:
         index = 0
         print(finger_table.keys())
         for key,value in sorted(finger_table.items()):
-            text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value)
+            if value is not None:
+                text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,value.ip)
+            else:
+                text +="N{0} + {1}: {2}\n".format(key-(2**index),2**index,"None")
             index +=1
         return text
 
@@ -122,7 +125,7 @@ def ctrlMsgReceived():
         if filename is None:
 	        # Finger update
             if finger is not None:
-                finger_table[finger] = suc_ip                
+                finger_table[finger] = ChordNode(suc_ip)            
                 myLogger.mnPrint(me.print_finger_table(finger_table))
             # Successor update
             else:
@@ -450,7 +453,7 @@ def closestPreceedingNode(key):
     global finger_table, finger_table_size
 
     # Starting at furthest point in table, moving closer, see if table entry preceeds the given key
-    for i in range(finger_table_size, -1, -1):
+    for i in range(finger_table_size):
         if keyInRange(finger_table[fingers[i]], me.chord_id, key):
             return finger_table[fingers[i]]
     

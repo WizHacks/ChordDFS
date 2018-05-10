@@ -3,3 +3,4 @@ insert amazingfile.txt
 get temp.txt
 get 1.txt
 get amazingfile.txt
+entries

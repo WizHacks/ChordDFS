@@ -89,7 +89,7 @@ def report():
     # report of log summaries etc
     inserts_str = inserts()
     gets_str = gets()
-    keys_tup = keys()
+    keys_tup = keys()        
     key_summary_str = key_summary(keys_tup[1])
     report_str = \
     '''
@@ -182,7 +182,7 @@ def keys():
     dictionary_re = re.compile(r"{.*}")
     key_map = {}
     if len(entries) == 0:
-        return "None"
+        return "None", {}
     for entry in entries:
         ipid_re = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+")
         time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")

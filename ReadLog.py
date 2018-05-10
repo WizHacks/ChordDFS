@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import re
 from ChordMessage import ChordMessage as c_msg
@@ -138,11 +139,11 @@ def clients():
     return len(nodes)
 
 def inserts():
-    global log_str
+    global log_str, num_replicates
     '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
     insert_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
     inserts = insert_re.findall(log_str)
-    num_inserts = len(inserts)
+    num_inserts = int(len(inserts)/num_replicates)
     hops_re = re.compile(r"hops:[0-9]+")
     hops = hops_re.findall("".join(inserts))
     num_re = re.compile(r'[0-9]+')
@@ -271,6 +272,18 @@ if __name__ == "__main__":
     except:
         pass        
     input_str = ""    
+
+    try:
+        # Open config file
+        configFile = open("chordDFS.config")
+        config = json.loads(configFile.read())
+        configFile.close()
+
+        # Load parameters from config file        
+        num_replicates = config['num_replicates']
+    except IOError as e:
+        print(e)
+
     # just run the report
     if len(sys.argv) > 1:        
         print(report())

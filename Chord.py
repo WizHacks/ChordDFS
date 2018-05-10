@@ -193,7 +193,7 @@ def ctrlMsgReceived():
         if msg["client_ip"] != None:
             sendCtrlMsg(msg["client_ip"], c_msg.INSERT_FILE, msg)
         # Current responsible entries
-        myLogger.mnPrint("Entries: {0}".format(entries.keys()))
+        myLogger.mnPrint("entry keys: {0}".format(entries.keys()))
 
     # Someone wants a file from us
     elif msg_type == c_msg.REQUEST_FILE:
@@ -286,9 +286,18 @@ def ctrlMsgReceived():
         if me.ip == tracker_node_ip:
             msg["file_list"] = allFiles.keys()
             sendCtrlMsg(msg["client_ip"], c_msg.GET_FILE_LIST, msg)
-    # TODO: avgs keys per node
+    # avgs keys per node
     elif msg_type == c_msg.ENTRIES:
-        pass
+        # log entries and pass request along        
+        myLogger.mnPrint("entries: {0}".format(print_entries()))
+        # we've come full circle -> tell client about success
+        if successor.ip == tracker_node_ip or\
+           (successor.ip == tracker_node_ip and successor.ip == me.ip):            
+            sendCtrlMsg(msg["client_ip"], c_msg.ENTRIES, msg)
+        else:
+            myLogger.mnPrint("Sending entries request forward: {0}".format(successor.ip))
+            sendCtrlMsg(successor.ip, c_msg.ENTRIES, msg)
+
     # TODO: when will this happen?
     elif msg_type == c_msg.ERR:
         pass
@@ -545,6 +554,16 @@ def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):
             mnPrint(filename + " not found in entries")
     myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
+
+def print_entries():
+    global entries
+    if len(entries.keys()) == 0:
+        return "{}
+    entries_str = "{"
+    for key,value in entries.items():
+        entries_str += "{0}:{1},".format(key,value.chord_id)
+    entries_str = entries_str[:-1] + "}"
+    return entries_str
 
 def exit(arg=None):
     '''exit the application

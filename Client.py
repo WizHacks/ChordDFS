@@ -90,6 +90,15 @@ class Client():
 		msg["client_ip"] = self.ip
 		msg["hops"] = 0
 		self.sendMessage(c_msg.GET_FILE_LIST, msg)
+
+	def entries(self):
+		'''Tell server to write entries to log
+		'''
+		self.last_request = [c_msg.ENTRIES]	
+		msg = newMsgDict()        
+		msg["client_ip"] = self.ip
+		msg["hops"] = 0
+		self.sendMessage(c_msg.ENTRIES, msg)
 		
 
 	'''Helper methods'''
@@ -105,7 +114,9 @@ class Client():
 		elif request == c_msg.INSERT_FILE:
 			self.insert_file(args[0])			
 		elif request == c_msg.GET_FILE_LIST:
-			self.get_file_list()			
+			self.get_file_list()
+		elif request == c_msg.ENTRIES:
+			self.entries()			
 		elif request == "LS":
 			self.list_dir()		
 
@@ -147,7 +158,7 @@ class Client():
 			self.myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
 			self.list_dir()
 		# success for last request
-		if msg_type == c_msg.INSERT_FILE:
+		if msg_type == c_msg.INSERT_FILE or msg_type == c_msg.ENTRIES:
 			self.myLogger.mnPrint("Success: last request:{0} succeeded!".format(self.last_request))			
 		# error for last request
 		if msg_type == c_msg.ERR:
@@ -233,7 +244,8 @@ if __name__ == "__main__":
     my_ip = ""
     my_name = ""
     if len(sys.argv) < 3:
-        mnPrint("Missing self ip and name!")
+        print("Missing self ip and name!")
+        sys.stdout.flush()
         sys.exit()
     my_ip = sys.argv[1]
     my_name = sys.argv[2]    

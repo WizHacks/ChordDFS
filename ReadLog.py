@@ -160,7 +160,7 @@ def gets():
     '''2018-05-09_10:41:42.752116 <172.1.1.2_c>: msg type:SEND_FILE rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:SEND_FILE,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''    
     get_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:SEND_FILE.*hops:[0-9]+")
     gets = get_re.findall(log_str)
-    num_gets = len(gets)
+    num_gets = int(len(inserts)/num_replicates)
     hops_re = re.compile(r"hops:[0-9]+")
     hops = hops_re.findall("".join(gets))
     num_re = re.compile(r'[0-9]+')

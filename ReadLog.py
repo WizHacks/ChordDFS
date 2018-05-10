@@ -148,7 +148,7 @@ def inserts():
     global log_str, num_replicates
     # example <172.1.1.2_c>: msg type:INSERT sent to 172.1.1.1:
     '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
-    insert_sent_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT sent")
+    insert_sent_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT sent to 172.1.1.1")
     insert_sent = insert_sent_re.findall(log_str)
     num_inserts_sent = len(insert_sent)
     insert_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
@@ -162,7 +162,10 @@ def inserts():
         avg_hops = 0
     else:
         avg_hops = sum(hops_nums)/len(hops_nums)
-    inserts_str = (num_inserts_sent,num_inserts,avg_hops,num_inserts/num_inserts_sent)
+    loss_rate = 0
+    if num_inserts_sent != 0:
+        loss_rate = 1 - (num_inserts/num_inserts_sent)      
+    inserts_str = (num_inserts_sent,num_inserts,avg_hops,loss_rate)
     return inserts_str
 
 def gets():
@@ -182,7 +185,10 @@ def gets():
         avg_hops = 0
     else:
         avg_hops = sum(hops_nums)/len(hops_nums)
-    gets_str = (num_get_sent,num_gets,avg_hops,num_gets/num_get_sent)
+    loss_rate = 0
+    if num_get_sent != 0:
+        loss_rate = 1 - num_gets/num_get_sent    
+    gets_str = (num_get_sent,num_gets,avg_hops,loss_rate)
     return gets_str
 
 def keys():

@@ -51,7 +51,7 @@ def startNetwork(num_nodes):
     with open("chordDFS.config", "r") as configFile:
         config = json.loads(configFile.read())        
     with open("chordDFS.config", "w") as configFile:
-        config["finger_table_size"] = int(math.ceil(math.log(num_nodes) + 3))
+        config["finger_table_size"] = int(math.ceil(math.log(num_nodes, 2) + 3))
         config = json.dumps(config)
         configFile.write(config)
 

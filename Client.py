@@ -274,7 +274,7 @@ if __name__ == "__main__":
     # script testing        
     script = None    
     if len(sys.argv) == 4:
-        script = sys.argv[3]    
+        script = sys.argv[3]
         
     # Socket specifically for communicating with other chord nodes
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

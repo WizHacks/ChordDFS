@@ -163,11 +163,27 @@ def ctrlMsgReceived():
     # Someone sent us a file
     elif msg_type == c_msg.SEND_FILE:
         filename = msg['filename']
+        fileNode = ChordNode(filename, isFile=True)
         content = msg['content']
+
+        '''
+        # If this file was for a recovery, make sure it was meant for us, otherwise reinsert
+        lost_key = msg['hash']
+        if lost_key is not None and predecessor is not None:
+            if not keyInRange(lost_key, predecessor.ip, me.ip, inc_end=True):
+                myLogger.mnPrint("Received {0} to recover at {1}, but this doesn't belong to us".format(fileNode, lost_key))
+                # Wait, and then restart request to recover file
+                t = threading.Timer(2 * refresh_rate, lambda: sendCtrlMsg(tracker.ip, c_msg.SOMEONE_DIED, msg))
+                t.start()
+                return
+        '''
+
+        # Save this file
         with open("{0}/{1}".format(file_dir_path, filename), "w") as newFile:
             newFile.write(content)
-        entries[filename] = ChordNode(filename, isFile=True)
+        entries[filename] = fileNode
         myLogger.mnPrint("Received file " + filename + " from " + str(addr[0]))
+
         # If file from the client -> tell them insertion was successful
         if msg["client_ip"] != None:
             sendCtrlMsg(msg["client_ip"], c_msg.INSERT_FILE, msg)
@@ -220,8 +236,10 @@ def ctrlMsgReceived():
         pred_ip = msg['pred_ip']
         if suc_ip is not None:
             successor = ChordNode(suc_ip)
+            myLogger.mnPrint("Successor updated by prev leaving: {0}".format(successor))
         elif pred_ip is not None:
             predecessor = ChordNode(pred_ip)
+            myLogger.mnPrint("Predecessor updated by prev leaving: {0}".format(predecessor))
 
     # We are supposed to insert a file into the network
     elif msg_type == c_msg.INSERT_FILE:
@@ -256,7 +274,6 @@ def ctrlMsgReceived():
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
         fileNode = ChordNode(filename, isFile=True)
         myLogger.mnPrint("Retrieving " + str(fileNode))
-        # TODO: do a timeout, and if we don't get a response go onto next id
         findSuccessor(fileNode.chord_id[0], me.ip, msg)
 
     # send all known entries back to client if tracker
@@ -304,7 +321,7 @@ def refresh():
                 sendCtrlMsg(successor.ip, c_msg.GET_PREDECESSOR, newMsgDict())
 
         # Update our finger table
-        if using_finger_table:
+        if using_finger_table and inNetwork:
             fixFingers()
 
         # Handle predecessor death
@@ -320,15 +337,15 @@ def refresh():
                 # Send any files that shouldn't be here to the predecessor
                 sendFilesToPred()
 
-        '''
+        
         counter += 1
-        if me.name == "n4" and counter >= 10:
-            counter = 0
+        if me.name == "n4" and counter == 30:
+            #counter = 0
             if inNetwork:
                 leave()
             else:
                 join()
-        '''
+        
 
         # Wait for short time
         time.sleep(refresh_rate)
@@ -515,7 +532,7 @@ def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):
             os.remove(file_dir_path + filename)
         else:
             mnPrint(filename + " not found in entries")
-    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)    
+    myLogger.mnPrint("Sending " + filename + " to " + dst_ip)
     sendCtrlMsg(dst_ip, c_msg.SEND_FILE, msg)
 
 def print_entries():

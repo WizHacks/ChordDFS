@@ -333,7 +333,7 @@ def refresh():
         # Handle predecessor death
         if predecessor != None:
             # If we were waiting on a response from our predecessor and never got one, assume they died
-            if waitingForAlive(predecessor.ip):
+            if waitingForAlive(predecessor.ip) and predecessor.ip is not successor.ip:
                 myLogger.mnPrint("Our predecessor {0} has died!".format(predecessor))
                 waiting_for_alive_resp[predecessor.ip] = False
                 predecessor = None
@@ -558,7 +558,7 @@ def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):
 def print_entries():
     global entries
     if len(entries.keys()) == 0:
-        return "{}
+        return "{}"
     entries_str = "{"
     for key,value in entries.items():
         entries_str += "{0}:{1},".format(key,value.chord_id)

@@ -82,6 +82,8 @@ def report():
     # report of log summaries etc
     inserts_str = inserts()
     gets_str = gets()
+    keys_tup = keys()
+    key_summary_str = key_summary(keys_tup[1])
     report_str = \
     '''
     Start: {0}\n\
@@ -94,9 +96,10 @@ def report():
     Inserts Avg Hops: {7}\n\
     # Gets: {8}\n\
     Gets Avg Hops: {9}\n\
-    Keys: {10}\n\
+    Keys Dist:\n{10}\n\
+    Key Summary: {11}\n\
     '''.format(start(),end(),servers(),clients(),ring(),stabilize(),\
-        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1],keys())
+        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1],keys_tup[0],key_summary_str)
     return report_str
 
 def stabilize():
@@ -168,8 +171,7 @@ def keys():
     2018-05-09_15:35:05.717302 <172.1.1.5, 35>: entries: {text.text:[33],newfile:[34]}
     '''
     entries_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+>: entries: {.*}")
-    entries = entries_re.findall(log_str)
-    print(entries)
+    entries = entries_re.findall(log_str)    
     dictionary_re = re.compile(r"{.*}")
     key_map = {}
     if len(entries) == 0:
@@ -187,10 +189,10 @@ def keys():
                 key_map["entries"] = n_entries
         else:
             key_map[ip] = {"timestamp":ts,"entries":n_entries}       
-    return print_key_map(key_map)
+    return print_key_map(key_map), key_map
 
 def print_key_map(key_map):
-    key_map_str = ""
+    key_map_str = "\t"
     for key in key_map.keys():
         key_map_str += "{0}:{1}\n\t".format(key,print_list(key_map[key]["entries"]))
     return key_map_str        
@@ -200,6 +202,21 @@ def print_list(some_list):
     for value in some_list:
         list_str += value + " "
     return list_str
+
+def key_summary(key_map):
+    file_set = set()   
+    key_map_str = ""
+    for key in key_map.keys():
+        entries = key_map[key]["entries"][0].replace("}","").replace("{","").split(",")
+        for entry in entries:
+            filename = entry.split(":")[0]
+            file_set.add(filename)
+        key_map[key]["num_entries"] = len(entries)
+    for key in key_map.keys():
+        key_map_str += "{0}-> # keys:{1}\n\t".format(key,key_map[key]["num_entries"])
+    key_map_str_head = "\n\tTotal Files: {0}\n\t".format(len(file_set))    
+    return key_map_str_head + key_map_str
+
 
 if __name__ == "__main__":       
     # Get every file in logs folder
@@ -279,5 +296,5 @@ if __name__ == "__main__":
             gets_str = gets()
             print("Gets: {0}\nAvg Hops: {1}".format(gets_str[0],gets_str[1]))
         if input_str == "keys":
-            print(keys())
+            print(keys()[0])
         sys.stdout.flush()

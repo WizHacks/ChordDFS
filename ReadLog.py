@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import re
 from ChordMessage import ChordMessage as c_msg
@@ -12,11 +13,17 @@ class MyLogger():
         self.client = client
 
     # Print that will show up in mininet output and get added to log file
-    def mnPrint(self, msg, debug=True):
+    def mnPrint(self, msg, debug=True):       
         # log only certain message types
-        msg_type = msg["msg_type"]
-        if msg_type not in [c_msg.SEND_FILE,c_msg.GET_FILE,c_msg.REQUEST_FILE,c_msg.INSERT_FILE,c_msg.GET_FILE_LIST,c_msg.ERR,c_msg.SUCCESS,c_msg.ENTRIES]:
-            return
+        try:
+            # filter msg types
+            messages = [c_msg.FIND_SUCCESSOR,c_msg.RETURN_SUCCESSOR,c_msg.GET_PREDECESSOR,c_msg.RETURN_PREDECESSOR,c_msg.NOTIFY_PREDECESSOR,c_msg.CHECK_ALIVE,c_msg.AM_ALIVE,c_msg.SOMEONE_DIED,\
+                            c_msg.LEAVING]
+            for msg_type in messages:
+                if msg.find(msg_type) > 0:
+                    return            
+        except:
+            pass     
         if self.client:
             # Format msg
             msg = "<{0}_c>: {1}".format(self.ip, msg)
@@ -82,7 +89,7 @@ def report():
     # report of log summaries etc
     inserts_str = inserts()
     gets_str = gets()
-    keys_tup = keys()
+    keys_tup = keys()        
     key_summary_str = key_summary(keys_tup[1])
     report_str = \
     '''
@@ -132,11 +139,11 @@ def clients():
     return len(nodes)
 
 def inserts():
-    global log_str
+    global log_str, num_replicates
     '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
     insert_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
     inserts = insert_re.findall(log_str)
-    num_inserts = len(inserts)
+    num_inserts = int(len(inserts)/num_replicates)
     hops_re = re.compile(r"hops:[0-9]+")
     hops = hops_re.findall("".join(inserts))
     num_re = re.compile(r'[0-9]+')
@@ -175,7 +182,7 @@ def keys():
     dictionary_re = re.compile(r"{.*}")
     key_map = {}
     if len(entries) == 0:
-        return "None"
+        return "None", {}
     for entry in entries:
         ipid_re = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+")
         time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")
@@ -185,15 +192,15 @@ def keys():
         # only use most up to date info
         if ip in key_map:
             if key_map[ip]["timestamp"] < ts:
-                key_map["timestamp"] = ts
-                key_map["entries"] = n_entries
+                key_map[ip]["timestamp"] = ts
+                key_map[ip]["entries"] = n_entries
         else:
             key_map[ip] = {"timestamp":ts,"entries":n_entries}       
     return print_key_map(key_map), key_map
 
 def print_key_map(key_map):
     key_map_str = "\t"
-    for key in key_map.keys():
+    for key in key_map.keys():        
         key_map_str += "{0}:{1}\n\t".format(key,print_list(key_map[key]["entries"]))
     return key_map_str        
 
@@ -207,11 +214,15 @@ def key_summary(key_map):
     file_set = set()   
     key_map_str = ""
     for key in key_map.keys():
-        entries = key_map[key]["entries"][0].replace("}","").replace("{","").split(",")
-        for entry in entries:
+        entries = key_map[key]["entries"][0].replace("}","").replace("{","").split(";")
+        empty = 0
+        for entry in entries:            
             filename = entry.split(":")[0]
-            file_set.add(filename)
-        key_map[key]["num_entries"] = len(entries)
+            if filename != "":                            
+                file_set.add(filename)
+            else:
+                empty += 1
+        key_map[key]["num_entries"] = len(entries) - empty
     for key in key_map.keys():
         key_map_str += "{0}-> # keys:{1}\n\t".format(key,key_map[key]["num_entries"])
     key_map_str_head = "\n\tTotal Files: {0}\n\t".format(len(file_set))    
@@ -261,6 +272,18 @@ if __name__ == "__main__":
     except:
         pass        
     input_str = ""    
+
+    try:
+        # Open config file
+        configFile = open("chordDFS.config")
+        config = json.loads(configFile.read())
+        configFile.close()
+
+        # Load parameters from config file        
+        num_replicates = config['num_replicates']
+    except IOError as e:
+        print(e)
+
     # just run the report
     if len(sys.argv) > 1:        
         print(report())

@@ -194,8 +194,8 @@ def ctrlMsgReceived():
     elif msg_type == c_msg.REQUEST_FILE:
         # Send directly to client
         if msg["client_ip"] is not None:
-            sendFile(msg["client_ip"], msg, readFromFile=True)
             myLogger.mnPrint(msg['filename'] + " requested from " + msg["client_ip"])
+            sendFile(msg["client_ip"], msg, readFromFile=True)            
         # Send to node who requested it
         # TODO: don't think this should happen
         else:
@@ -538,10 +538,10 @@ def sendFile(dst_ip, msg, readFromFile=False, rmEntry=False):
 def print_entries():
     global entries
     if len(entries.keys()) == 0:
-        return "{}
+        return "{}"
     entries_str = "{"
     for key,value in entries.items():
-        entries_str += "{0}:{1},".format(key,value.chord_id)
+        entries_str += "{0}:{1};".format(key,value.chord_id)
     entries_str = entries_str[:-1] + "}"
     return entries_str
 

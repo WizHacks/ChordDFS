@@ -12,11 +12,17 @@ class MyLogger():
         self.client = client
 
     # Print that will show up in mininet output and get added to log file
-    def mnPrint(self, msg, debug=True):
+    def mnPrint(self, msg, debug=True):       
         # log only certain message types
-        msg_type = msg["msg_type"]
-        if msg_type not in [c_msg.SEND_FILE,c_msg.GET_FILE,c_msg.REQUEST_FILE,c_msg.INSERT_FILE,c_msg.GET_FILE_LIST,c_msg.ERR,c_msg.SUCCESS,c_msg.ENTRIES]:
-            return
+        try:
+            # filter msg types
+            messages = [c_msg.FIND_SUCCESSOR,c_msg.RETURN_SUCCESSOR,c_msg.GET_PREDECESSOR,c_msg.RETURN_PREDECESSOR,c_msg.NOTIFY_PREDECESSOR,c_msg.CHECK_ALIVE,c_msg.AM_ALIVE,c_msg.SOMEONE_DIED,\
+                            c_msg.LEAVING]
+            for msg_type in messages:
+                if msg.find(msg_type) > 0:
+                    return            
+        except:
+            pass     
         if self.client:
             # Format msg
             msg = "<{0}_c>: {1}".format(self.ip, msg)
@@ -185,15 +191,15 @@ def keys():
         # only use most up to date info
         if ip in key_map:
             if key_map[ip]["timestamp"] < ts:
-                key_map["timestamp"] = ts
-                key_map["entries"] = n_entries
+                key_map[ip]["timestamp"] = ts
+                key_map[ip]["entries"] = n_entries
         else:
             key_map[ip] = {"timestamp":ts,"entries":n_entries}       
     return print_key_map(key_map), key_map
 
 def print_key_map(key_map):
     key_map_str = "\t"
-    for key in key_map.keys():
+    for key in key_map.keys():        
         key_map_str += "{0}:{1}\n\t".format(key,print_list(key_map[key]["entries"]))
     return key_map_str        
 
@@ -207,11 +213,15 @@ def key_summary(key_map):
     file_set = set()   
     key_map_str = ""
     for key in key_map.keys():
-        entries = key_map[key]["entries"][0].replace("}","").replace("{","").split(",")
-        for entry in entries:
+        entries = key_map[key]["entries"][0].replace("}","").replace("{","").split(";")
+        empty = 0
+        for entry in entries:            
             filename = entry.split(":")[0]
-            file_set.add(filename)
-        key_map[key]["num_entries"] = len(entries)
+            if filename != "":                            
+                file_set.add(filename)
+            else:
+                empty += 1
+        key_map[key]["num_entries"] = len(entries) - empty
     for key in key_map.keys():
         key_map_str += "{0}-> # keys:{1}\n\t".format(key,key_map[key]["num_entries"])
     key_map_str_head = "\n\tTotal Files: {0}\n\t".format(len(file_set))    

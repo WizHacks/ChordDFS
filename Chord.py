@@ -126,7 +126,7 @@ def ctrlMsgReceived():
 	        # Finger update
             if finger is not None:
                 finger_table[finger] = ChordNode(suc_ip)            
-                myLogger.mnPrint(me.print_finger_table(finger_table))
+                #myLogger.mnPrint(me.print_finger_table(finger_table))
             # Successor update
             else:
                 successor = ChordNode(suc_ip)
@@ -282,7 +282,8 @@ def ctrlMsgReceived():
         outstanding_file_reqs[filename] = c_msg.OP_REQ_FILE
         fileNode = ChordNode(filename, isFile=True)
         myLogger.mnPrint("Retrieving " + str(fileNode))
-        findSuccessor(fileNode.chord_id[0], me.ip, msg)
+        for k in fileNode.chord_id:
+            findSuccessor(k, me.ip, msg)
 
     # send all known entries back to client if tracker
     elif msg_type == c_msg.GET_FILE_LIST:
@@ -354,8 +355,8 @@ def refresh():
                     leave()
                 else:
                     join()
-            #if bernoulli(fail_prob):
-            #    fail()
+            if bernoulli(fail_prob):
+                fail()
 
         # Wait for short time
         time.sleep(refresh_rate)

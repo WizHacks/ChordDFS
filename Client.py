@@ -187,17 +187,17 @@ def exit(arg=None):
     sys.exit()
 
 def ctrlMsgReceived():
-	'''Handle received a msg from control socket'''
-	global me
-	# Get data from socket
-	me.control_sock.settimeout(me.rate)
-	try:
-		data, addr = me.control_sock.recvfrom(1024)
-	except socket.error as e:
-		print(e)
-		return
-	# Parse message type and respond accordingly        
-	me.processResponse(data,addr)
+    '''Handle received a msg from control socket'''
+    global me
+    # Get data from socket
+    me.control_sock.settimeout(me.rate)
+    try:
+        data, addr = me.control_sock.recvfrom(1024)
+    except socket.error as e:
+        print(e)
+        return
+    # Parse message type and respond accordingly        
+    me.processResponse(data,addr)
 
 def processStdin():
     '''Process the stdin input and take appropriate action

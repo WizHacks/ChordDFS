@@ -187,17 +187,17 @@ def exit(arg=None):
     sys.exit()
 
 def ctrlMsgReceived():
-    '''Handle received a msg from control socket'''
-    global me
-    # Get data from socket
+	'''Handle received a msg from control socket'''
+	global me
+	# Get data from socket
 	me.control_sock.settimeout(me.rate)
-    try:
-        data, addr = me.control_sock.recvfrom(1024)
-    except socket.error as e:
-        print(e)
-        return
-    # Parse message type and respond accordingly        
-    me.processResponse(data,addr)
+	try:
+		data, addr = me.control_sock.recvfrom(1024)
+	except socket.error as e:
+		print(e)
+		return
+	# Parse message type and respond accordingly        
+	me.processResponse(data,addr)
 
 def processStdin():
     '''Process the stdin input and take appropriate action
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     if script is not None:
         cmds_to_run = []
         with open(script, "r") as f_in:
-            cmds_to_run = f_in.read().split("\n")
+            cmds_to_run = f_in.read().strip().split("\n")
         while len(cmds_to_run) != 0:
             args = cmds_to_run.pop(0).split(" ")
             if len(args) != 0 and args[0] != "":

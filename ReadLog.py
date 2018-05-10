@@ -1,7 +1,8 @@
-from datetime import datetime
 import os
 import sys
 import re
+from ChordMessage import ChordMessage as c_msg
+from datetime import datetime
 
 class MyLogger():
     def __init__(self, ip, chord_id, log_file_path, client=False):     
@@ -12,6 +13,10 @@ class MyLogger():
 
     # Print that will show up in mininet output and get added to log file
     def mnPrint(self, msg, debug=True):
+        # log only certain message types
+        msg_type = msg["msg_type"]
+        if msg_type not in [c_msg.SEND_FILE,c_msg.GET_FILE,c_msg.REQUEST_FILE,c_msg.INSERT_FILE,c_msg.GET_FILE_LIST,c_msg.ERR,c_msg.SUCCESS,c_msg.ENTRIES]:
+            return
         if self.client:
             # Format msg
             msg = "<{0}_c>: {1}".format(self.ip, msg)
@@ -89,14 +94,15 @@ def report():
     Inserts Avg Hops: {7}\n\
     # Gets: {8}\n\
     Gets Avg Hops: {9}\n\
+    Keys: {10}\n\
     '''.format(start(),end(),servers(),clients(),ring(),stabilize(),\
-        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1])
+        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1],keys())
     return report_str
 
 def stabilize():
     global log_str
     # example 2018-05-09_10:40:34.210800 <172.1.1.3, 11>: Successor updated by stabilize: key: 172.1.1.4, chord id: 47
-    stabilize_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+.[0-9]+.[0-9]+.[0-9], [0-9]+>: Successor updated by stabilize")    
+    stabilize_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+>: Successor updated by stabilize")    
     times_stab = stabilize_re.findall(log_str)
     time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")    
     times = time_re.findall("".join(times_stab))    
@@ -117,15 +123,15 @@ def clients():
     global log_str    
     # find clients    
     # ex: I'm a chord client, my IP is 172.1.1.2
-    ring_re = re.compile(r"chord client, my IP is [0-9]+.[0-9]+.[0-9]+.[0-9]+")
-    ip_re = re.compile(r"[0-9]+.[0-9]+.[0-9]+.[0-9]")    
+    ring_re = re.compile(r"chord client, my IP is [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")
+    ip_re = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")    
     nodes = ip_re.findall("".join(ring_re.findall(log_str)))
     return len(nodes)
 
 def inserts():
     global log_str
     '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
-    insert_re = re.compile(r"<[0-9]+.[0-9]+.[0-9]+.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
+    insert_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
     inserts = insert_re.findall(log_str)
     num_inserts = len(inserts)
     hops_re = re.compile(r"hops:[0-9]+")
@@ -142,7 +148,7 @@ def inserts():
 def gets():
     global log_str
     '''2018-05-09_10:41:42.752116 <172.1.1.2_c>: msg type:SEND_FILE rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:SEND_FILE,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''    
-    get_re = re.compile(r"<[0-9]+.[0-9]+.[0-9]+.[0-9]+_c>: msg type:SEND_FILE.*hops:[0-9]+")
+    get_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:SEND_FILE.*hops:[0-9]+")
     gets = get_re.findall(log_str)
     num_gets = len(gets)
     hops_re = re.compile(r"hops:[0-9]+")
@@ -157,7 +163,43 @@ def gets():
     return gets_str
 
 def keys():
-    return "TODO"
+    '''
+    2018-05-09_15:35:05.715598 <172.1.1.3, 11>: entries: {}
+    2018-05-09_15:35:05.717302 <172.1.1.5, 35>: entries: {text.text:[33],newfile:[34]}
+    '''
+    entries_re = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6} <[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+>: entries: {.*}")
+    entries = entries_re.findall(log_str)
+    print(entries)
+    dictionary_re = re.compile(r"{.*}")
+    key_map = {}
+    if len(entries) == 0:
+        return "None"
+    for entry in entries:
+        ipid_re = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+, [0-9]+")
+        time_re = re.compile(r"[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{6}")
+        ip = ipid_re.findall(entry)[0]
+        ts = datetime.strptime(time_re.findall(entry)[0],"%H:%M:%S.%f")
+        n_entries = dictionary_re.findall(entry)        
+        # only use most up to date info
+        if ip in key_map:
+            if key_map[ip]["timestamp"] < ts:
+                key_map["timestamp"] = ts
+                key_map["entries"] = n_entries
+        else:
+            key_map[ip] = {"timestamp":ts,"entries":n_entries}       
+    return print_key_map(key_map)
+
+def print_key_map(key_map):
+    key_map_str = ""
+    for key in key_map.keys():
+        key_map_str += "{0}:{1}\n\t".format(key,print_list(key_map[key]["entries"]))
+    return key_map_str        
+
+def print_list(some_list):
+    list_str = ""
+    for value in some_list:
+        list_str += value + " "
+    return list_str
 
 if __name__ == "__main__":       
     # Get every file in logs folder
@@ -185,14 +227,14 @@ if __name__ == "__main__":
     log_str = ""
     sorted_entries = sorted(entries, key=lambda e: e['time'])
     # Print all entries in order
-    # update = 0
-    # iter = 0
+    update = 0
+    iter = 0
     for entry in sorted_entries:
-        # update += 1
-        # if update == 1000:
-        #     iter += 1
-        #     print(iter)
-        #     update = 0
+        update += 1
+        if update == 1000:
+            iter += 1
+            print("iter: {0}x1000".format(iter))
+            update = 0
         log_str += entry['log']        
 
     # same compiled logs into 1  

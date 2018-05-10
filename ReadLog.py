@@ -99,14 +99,20 @@ def report():
     # Clients: {3}\n\
     Ring: {4}\n\
     Stabilization Time: {5}\n\
-    # Inserts: {6}\n\
-    Inserts Avg Hops: {7}\n\
-    # Gets: {8}\n\
-    Gets Avg Hops: {9}\n\
-    Keys Dist:\n{10}\n\
-    Key Summary: {11}\n\
+    Inserts Sent: {6}\n\
+    Inserts Rcvd: {7}\n\
+    Inserts Avg Hops: {8}\n\
+    Insert Loss Rate: {9}\n\
+    Gets Sent: {10}\n\
+    Gets Rcvd: {11}\n\
+    Gets Avg Hops: {12}\n\
+    Gets Loss Rate: {13}
+    Keys Dist:\n{14}\n\
+    Key Summary: {15}\n\
     '''.format(start(),end(),servers(),clients(),ring(),stabilize(),\
-        inserts_str[0],inserts_str[1],gets_str[0],gets_str[1],keys_tup[0],key_summary_str)
+        inserts_str[0],inserts_str[1],inserts_str[2],inserts_str[3],\
+        gets_str[0],gets_str[1],gets_str[2],gets_str[3],\
+        keys_tup[0],key_summary_str)
     return report_str
 
 def stabilize():
@@ -140,7 +146,11 @@ def clients():
 
 def inserts():
     global log_str, num_replicates
+    # example <172.1.1.2_c>: msg type:INSERT sent to 172.1.1.1:
     '''2018-05-09_10:40:36.868994 <172.1.1.2_c>: msg type:INSERT rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:INSERT,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''
+    insert_sent_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT sent")
+    insert_sent = insert_sent_re.findall(log_str)
+    num_inserts_sent = len(insert_sent)
     insert_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:INSERT rcvd .*hops:[0-9]+")
     inserts = insert_re.findall(log_str)
     num_inserts = int(len(inserts)/num_replicates)
@@ -152,15 +162,18 @@ def inserts():
         avg_hops = 0
     else:
         avg_hops = sum(hops_nums)/len(hops_nums)
-    inserts_str = (num_inserts,avg_hops)
+    inserts_str = (num_inserts_sent,num_inserts,avg_hops,num_inserts/num_inserts_sent)
     return inserts_str
 
 def gets():
     global log_str
     '''2018-05-09_10:41:42.752116 <172.1.1.2_c>: msg type:SEND_FILE rcvd from 172.1.1.1: msg:{client_ip:172.1.1.2,target:172.1.1.1,msg_type:SEND_FILE,hops:7,filename:temp.txt,content:testingggg,suc_ip:172.1.1.1,key:5}'''    
-    get_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:SEND_FILE.*hops:[0-9]+")
+    get_sent_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:SEND_FILE sent")
+    get_re = re.compile(r"<[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_c>: msg type:SEND_FILE rcvd .*hops:[0-9]+")
+    get_sent = get_sent_re.findall(log_str)
+    num_get_sent = len(get_sent)
     gets = get_re.findall(log_str)
-    num_gets = int(len(inserts)/num_replicates)
+    num_gets = int(len(gets)/num_replicates)
     hops_re = re.compile(r"hops:[0-9]+")
     hops = hops_re.findall("".join(gets))
     num_re = re.compile(r'[0-9]+')
@@ -169,7 +182,7 @@ def gets():
         avg_hops = 0
     else:
         avg_hops = sum(hops_nums)/len(hops_nums)
-    gets_str = (num_gets,avg_hops)
+    gets_str = (num_get_sent,num_gets,avg_hops,num_gets/num_get_sent)
     return gets_str
 
 def keys():
@@ -314,7 +327,7 @@ if __name__ == "__main__":
             print(report())
         if input_str == "inserts":
             inserts_str = inserts()
-            print("Inserts: {0}\nAvg Hops: {1}".format(inserts_str[0],inserts_str[1]))
+            print("Inserts Sent: {0}\nInserts Rcvd: {1}\nAvg Hops: {2}".format(inserts_str[0],inserts_str[1],inserts_str[2]))
         if input_str == "gets":
             gets_str = gets()
             print("Gets: {0}\nAvg Hops: {1}".format(gets_str[0],gets_str[1]))

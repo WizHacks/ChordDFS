@@ -190,7 +190,7 @@ def ctrlMsgReceived():
     '''Handle received a msg from control socket'''
     global me
     # Get data from socket
-	me.control_sock.settimeout(me.rate)
+    me.control_sock.settimeout(me.rate)
     try:
         data, addr = me.control_sock.recvfrom(1024)
     except socket.error as e:

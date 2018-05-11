@@ -1,5 +1,0 @@
-n1 python Chord.py n1 \n1 &	
-n3 python Chord.py n3 \n3 &	
-n3 python Chord.py n4 \n4 &	
-n3 python Chord.py n5 \n5 &	
-n2 python Client.py n2 \n2	
